@@ -13,3 +13,4 @@ pathlib==1.0.1
 streamlit==1.30.0
 watchdog==3.0.0
 pydeck>=0.8.1
+tqdm==4.66.1
