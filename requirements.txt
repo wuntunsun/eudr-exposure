@@ -14,3 +14,6 @@ openpyxl==3.1.2
 streamlit==1.30.0
 watchdog==3.0.0
 pydeck>=0.8.1
+missingno==0.5.2
+geopandas==0.14.2
+Cartopy==0.22.0
