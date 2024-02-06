@@ -25,7 +25,7 @@ def main():
     """)
     parser.add_argument("command", choices=commands)
     parser.add_argument("-g", "--gpkg", nargs='?', default="data/geoply-sample.gpkg")
-    parser.add_argument("-l", "--location", nargs='*', default=[52.520008, 13.404954])
+    parser.add_argument("-l", "--location", nargs='*', default=[-20.00027, -59.99658])
     parser.add_argument("-y", "--year", nargs='?', default="2020", type=int)
     parser.add_argument("-v", "--verbose", default=False, action=argparse.BooleanOptionalAction)
     args=parser.parse_args()

@@ -47,13 +47,13 @@ def area(gdf: gpd.GeoDataFrame, lat: float, long: float, year: int, verbose: boo
 
     # TODO: there should be 0 or 1 matches but maybe we should check?
     mask = gdf.geometry.contains(pt)
-    first_valid_index = None if not mask.any() else gdf[mask].index[0]
-    area = None if first_valid_index == None else gdf.loc[first_valid_index].area
+    first_valid_index = None if not mask.any() else gdf.loc[mask].index[0]
+    area = None if first_valid_index == None else gdf.iloc[first_valid_index]['area']
 
     if verbose:
         print(f'location: [{lat}, {long}], in CRS: {pt}, index: {first_valid_index}')
         if not first_valid_index == None:
-            print(f'geometry: {gdf.loc[first_valid_index].geometry}')
+            print(f'geometry: {gdf.iloc[first_valid_index].geometry}')
 
     return area
 
