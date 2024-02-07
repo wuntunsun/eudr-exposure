@@ -29,7 +29,7 @@ While the resulting map data are a largely viable relative indicator of trends, 
 
 This global dataset is divided into 10x10 degree tiles, consisting of seven files per tile. All files contain unsigned 8-bit values and have a spatial resolution of 1 arc-second per pixel, or approximately 30 meters per pixel at the equator. Only lossyear and last are updated annualy.
 
-The 'granules' come as GeoTif .tif files that can be converted via geopandas or similar
+The 'granules' come as GeoTiff .tif files that can be converted via geopandas or similar
 e.g. https://stackoverflow.com/questions/64589390/python-georasters-geotiff-image-into-geopandas-dataframe-or-pandas-dataframe
 
 Stand-replacement disturbance events in forests create large areas free of tree dominance...
@@ -88,12 +88,12 @@ remote sensing, plus Tier 4.
 
 2. Year of gross forest cover loss event (lossyear): Forest loss during the period 2000-2022, defined as a stand-replacement disturbance, or a change from a forest to non-forest state. Encoded as either 0 (no loss) or else a value in the range 1-20, representing loss detected primarily in the year 2001-2022, respectively.
 
-3. Possibly aggregate from 30x30 meters (at the equator) due to the size of the data e.g. 10GB compressed for the 'lossyear' GeoTif.
+3. Possibly aggregate from 30x30 meters (at the equator) due to the size of the data e.g. 10GB compressed for the 'lossyear' GeoTiff.
 
 Example for deforestation prediction: 
 https://www.mdpi.com/2076-3417/13/3/1772
 
-My idea would be to predict 'spread' in trend GeoTif data such as the 'Hansen' dataset. 
+My idea would be to predict 'spread' in trend GeoTiff data such as the 'Hansen' dataset. 
 
 Hypothesis: Regions are at higher risk of 'deforestation' when certain 'sector' assets are established.
 

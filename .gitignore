@@ -136,3 +136,6 @@ __MACOSX/
 .vscode
 .python-version
 data.zip
+
+# project stuff
+data/geoply-sample.csv
