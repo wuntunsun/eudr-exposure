@@ -21,6 +21,7 @@ NOTES/ #TODO:
 # import packages
 import os
 import pandas as pd
+import openpyxl
 from flags import PATH_TO_INPUT_FOLDER, PATH_TO_OUTPUT_FOLDER
 
 # define function to prepare SFI data
@@ -78,8 +79,9 @@ def process_and_save_sfi_data():
     
     
     # SECTOR
-    df_steel["sector"] = "steel"+"primary_product="+df_steel["primary_product"]+"production_type="+df_steel["primary_production_type"]+"plant_type="+df_steel["plant_type"]
-    
+    df_steel['primary_product'].fillna('', inplace=True)
+    df_steel["sector"] = "steel"+"/"+df_steel["primary_product"].str.lower()
+
     # EXPORT
     df_steel = df_steel[vars_to_keep]     
     
@@ -100,7 +102,8 @@ def process_and_save_sfi_data():
             df_cement[column] = float('nan')
             
     # SECTOR
-    df_cement["sector"] = "cement"+"production_type="+df_cement["production_type"]+"plant_type="+df_cement["plant_type"]
+    df_cement['production_type'].fillna('', inplace=True)
+    df_cement["sector"] = "cement"+"/"+df_cement["production_type"].str.lower()
     
     # EXPORT
     df_cement = df_cement[vars_to_keep]
@@ -126,7 +129,8 @@ def process_and_save_sfi_data():
             df_pulp_paper[column] = float('nan')
             
     # SECTOR
-    df_pulp_paper["sector"] = "pulp_paper"+"plant_type="+df_pulp_paper["planty_type"]+"fuel="+df_pulp_paper["fuel"]
+    df_pulp_paper['planty_type'].fillna('', inplace=True)
+    df_pulp_paper["sector"] = "pulp paper"+"/"+df_pulp_paper["planty_type"].str.lower()
     
     # EXPORT
     df_pulp_paper = df_pulp_paper[vars_to_keep]
@@ -147,7 +151,8 @@ def process_and_save_sfi_data():
             df_petrochemicals[column] = float('nan')
             
     # SECTOR
-    df_petrochemicals["sector"] = "petrochemicals"+"petrochemical="+df_petrochemicals["petrochemical"]+"cracker="+df_petrochemicals["cracker"]
+    df_petrochemicals['petrochemical'].fillna('', inplace=True)
+    df_petrochemicals["sector"] = "petrochemicals"+"/"+df_petrochemicals["petrochemical"]
     
     # EXPORT
     df_petrochemicals = df_petrochemicals[vars_to_keep]
@@ -169,7 +174,8 @@ def process_and_save_sfi_data():
             df_wastewater[column] = float('nan')
             
     # SECTOR
-    df_wastewater["sector"] = "wastewater"+"primary_treatment="+df_wastewater["primary_treatment"]+"secondary_treatment="+df_wastewater["secondary_treatment"]
+    df_wastewater['primary_treatment'].fillna('', inplace=True)
+    df_wastewater["sector"] = "wastewater"+"/"+df_wastewater["primary_treatment"].str.lower()
     # TODO perhaps there is more
     
     # EXPORT
@@ -194,7 +200,8 @@ def process_and_save_sfi_data():
             df_beef[column] = float('nan')
             
     # SECTOR
-    df_beef["sector"] = "beef"+"facilty_type="+df_beef["facility_type"]
+    df_beef['facility_type'].fillna('', inplace=True)
+    df_beef["sector"] = "beef"+"/"+df_beef["facility_type"].str.lower()
     
     # EXPORT
     df_beef = df_beef[vars_to_keep]
@@ -215,10 +222,13 @@ def process_and_save_sfi_data():
         
     # Rename columns
     df_sfi.rename(columns={'iso3': 'country_iso'}, inplace=True)
+
+    # Generate a unique identifier
+    df_sfi['uid'] = ['SFI_' + str(num) for num in list(range(len(df_sfi)))]
     
     # Save output to CSV
-    # output_path = os.path.join(PATH_TO_OUTPUT_FOLDER,"asset_level_open_source_sfi.csv")
-    # df_sfi_combined.to_csv(output_path, index=False)
+    output_path = os.path.join(PATH_TO_OUTPUT_FOLDER,"asset_level_open_source_sfi.csv")
+    df_sfi.to_csv(output_path, index=False)
     
     return df_sfi
     

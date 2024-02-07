@@ -6,6 +6,17 @@ from climateandcompany.generate_asset_level_climate_trace import (
     process_and_save_climate_trace_data
 )
 
+from climateandcompany.generate_asset_level_SFI import (
+    process_and_save_sfi_data
+)
+
+from climateandcompany.generate_asset_level_GEM import (
+    process_and_save_gem_data
+)
+
+from climateandcompany.combine_asset_data import (
+    combine_asset_datasets
+
 from leaf.deforestation import (
     area,
     window
@@ -15,11 +26,11 @@ def main():
 
     class Command:
         AREA = 'area'
-        CLIMATE_TRACE = 'climate_trace'
+        ASSETS = 'assets'
         CRS = 'crs'
         WINDOW = 'window'
 
-    commands = [Command.AREA, Command.CLIMATE_TRACE, Command.CRS, Command.WINDOW]
+    commands = [Command.AREA, Command.ASSETS, Command.CRS, Command.WINDOW]
     parser=argparse.ArgumentParser(description="""
     Perform a command...
     """)
@@ -46,8 +57,11 @@ def main():
                 print('The given location is not contained in an area of deforestaton.')
             else:
                 print(f'The given location is contained in an area of {result} units.')
-        case Command.CLIMATE_TRACE:
+        case Command.ASSETS:
             process_and_save_climate_trace_data()
+            process_and_save_sfi_data()
+            process_and_save_gem_data()
+            combine_asset_datasets()
         case Command.CRS:
             gdf = gpd.read_file(gpkg)
             print(f'File {gpkg} contains CRS: {gdf.crs}')
@@ -55,6 +69,7 @@ def main():
             gdf = gpd.read_file(gpkg)
             result = window(gdf)
             print(f'File {gpkg} contains Window: {result}')
+
 
 if __name__ == '__main__':
     main()
