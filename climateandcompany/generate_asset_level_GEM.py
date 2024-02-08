@@ -53,8 +53,6 @@ def process_and_save_gem_data():
     input_path = os.path.join(PATH_TO_INPUT_FOLDER,
                                 'asset_level_data/global_energy_monitor')
     
-    print(input_path)
-
     # define pairs of file and sheet name
     files_for_import = os.listdir(input_path)
 
@@ -101,8 +99,7 @@ def process_and_save_gem_data():
     # create a dictionary of {sector: [file, sheet]}
             
     source_dict = {sector: [file, sheet] for sector, file, sheet in list(zip(sectors, files_for_import, sheets))}
-    print(source_dict)
-
+    
     #################################################
     #####    1) DATA IMPORT AND PREPARATION    ######
     #################################################
@@ -278,8 +275,7 @@ def process_and_save_gem_data():
 
     # STATUS
     df_oil_gas_extraction = df_oil_gas_extraction[df_oil_gas_extraction["status"] == "operating"]
-    print(df_oil_gas_extraction.columns)
-
+    
     # CAPACITY
     df_oil_gas_extraction["capacity"] = "NA (O&G extraction)"
     df_oil_gas_extraction["capacity_unit"] = "NA"
@@ -638,9 +634,9 @@ def process_and_save_gem_data():
     # OWNERSHIP INFORMARTION
     df_bioenergy["ownership_parent_name"] = "NA"
     df_bioenergy["ownership_parent_id"] = "NA"
-    df_bioenergy["ownership_owner_name"] = "owner"
+    df_bioenergy["ownership_owner_name"] = df_bioenergy["owner"]
     df_bioenergy["ownership_owner_id"] = "NA"
-    df_bioenergy["ownership_operator_name"] = "operator"
+    df_bioenergy["ownership_operator_name"] = df_bioenergy["operator"]
     df_bioenergy["ownership_operator_id"] = "NA"
 
 
