@@ -40,13 +40,17 @@ def main():
     parser.add_argument("command", choices=commands)
     parser.add_argument("-gt", "--geoTIFF", nargs='?',
                         default="data/Hansen_GFC-2022-v1.10_lossyear_20S_060W.tif", 
-                        const="data/Hansen_GFC-2022-v1.10_lossyear_20S_060W.tif")
-    parser.add_argument("-w", "--window", nargs=4, 
-                        default=[2100, 2000, 500, 500])
+                        const="data/Hansen_GFC-2022-v1.10_lossyear_20S_060W.tif",
+                        help="Path to a GeoTIFF file.")
+    parser.add_argument("-w", "--window", nargs=4, type=float,
+                        default=[2100, 2000, 500, 500],
+                        help="A window into the GeoTIFF file as: col_off row_off width, height")
     parser.add_argument("-g", "--geometry", nargs='?',
-                        default="data/geoply-sample.gpkg", const="data/geoply-sample.gpkg")
+                        default="data/geoply-sample.gpkg", const="data/geoply-sample.gpkg",
+                        help="Path to a geometry file e.g. .gpkg file to be output by series command, or to be used as input for the area command.")
     parser.add_argument("-l", "--location", nargs=2, type=float,
-                        default=[-20.00027, -59.99658])
+                        default=[-20.00027, -59.99658],
+                        help="The location as: lat long")
     parser.add_argument("-y", "--year", nargs='?', type=int,
                         default="2020", const="2020", )
     parser.add_argument("-v", "--verbose", action=argparse.BooleanOptionalAction,

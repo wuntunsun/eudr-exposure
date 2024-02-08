@@ -12,6 +12,14 @@ import time
 
 from typing import Tuple, Optional
 
+def closest_index(gdf: gpd.GeoDataFrame, lat: float, long: float, year: int, verbose: bool = False) -> Tuple[float, int]:
+
+    if verbose:
+        print(f'location: [{lat}, {long}]')
+
+    distances = gdf.distance(Point(lat, long)).sort_values()
+    return distances.index[0]
+
 def window(gdf: gpd.GeoDataFrame) -> Tuple[float, float, float, float]:
     """Query the 'total_bounds' of the GeoDataFrame.
 
@@ -89,13 +97,16 @@ def to_series(geoTIFF: str, window: Tuple[float, float, float, float] = None, ve
         INDEX_LEFT = 'index_left'
         INDEX_RIGHT = 'index_right'
         VALUE_LEFT = 'lossyear_left'
-        VALUE_RIGHT = 'lossyear_left'
+        VALUE_RIGHT = 'lossyear_right'
         INDICES = 'indices'
 
     if verbose:
         print(f'geoTIFF: {geoTIFF}, window: {window}')
 
     with rio.open(geoTIFF) as src:
+
+        start_time = time.time()
+
         if verbose:
             print(src.meta)
             print(f'crs: {src.crs}')
@@ -109,6 +120,9 @@ def to_series(geoTIFF: str, window: Tuple[float, float, float, float] = None, ve
                 print(f'linear_units_factor: {src.crs.linear_units_factor}')
 
         band = src.read(BAND_INDEX, window=Window(window[0], window[1], window[2], window[3]))
+
+        read_time = time.time()
+
         mask = band != 0
         # Object holding a feature collection that implements the __geo_interface__
         results = (
@@ -120,6 +134,8 @@ def to_series(geoTIFF: str, window: Tuple[float, float, float, float] = None, ve
         geoms=list(results)
         gdf = gpd.GeoDataFrame.from_features(geoms, crs=src.crs)
 
+        shapes_time = time.time()
+
         if verbose:
             print(f'Window results in GeoDataFrame of shape: {gdf.shape}')
 
@@ -128,6 +144,8 @@ def to_series(geoTIFF: str, window: Tuple[float, float, float, float] = None, ve
         
         intersects.reset_index(inplace=True)
         intersects.rename(columns={'index': Token.INDEX_LEFT}, inplace=True)
+
+        sjoin_time = time.time()
 
         groups = intersects.groupby(Token.INDEX_LEFT)
         temp = intersects[intersects[Token.INDEX_LEFT] == intersects[Token.INDEX_RIGHT]].set_index(Token.INDEX_LEFT)
@@ -154,10 +172,14 @@ def to_series(geoTIFF: str, window: Tuple[float, float, float, float] = None, ve
         temp[Token.GROUP_ID] = groups.copy()
         temp.drop(Token.INDICES, axis=1, inplace=True)
 
+        group_time = time.time()
+
         # dissolve based on lossyear to generate any MULTIPOLYGON from disjoint geometry from same lossyear...
         temp2 = temp.dissolve(
             [Token.GROUP_ID, Token.VALUE]
         )
+
+        dissolve_time = time.time()
 
         group_ids = temp2.index.get_level_values(0).unique()
         lossyears = range(2001, 2023)
@@ -165,11 +187,16 @@ def to_series(geoTIFF: str, window: Tuple[float, float, float, float] = None, ve
         index = pd.MultiIndex.from_tuples(tuples=it.product(group_ids, lossyears), names=(Token.GROUP_ID, Token.VALUE))
         temp3 = temp2.reindex(index)
 
+        reindex_time = time.time()
+
         # geodetic coordinates (e.g. 4826) to meters (e.g. 3857) and vice-versa
 
         temp3.loc[temp3[Token.GEOMETRY].isna(), Token.GEOMETRY] = Polygon([])
         proj_3857 = temp3.to_crs(epsg=3347) # lambert projection
         temp3[Token.AREA] = proj_3857.geometry.area
+
+        area_time = time.time()
+
         #temp3['cum_area'] = proj_3857.groupby(group_id).area.cumsum()
 
         #for i in tqdm(group_ids.to_numpy()):
@@ -180,6 +207,8 @@ def to_series(geoTIFF: str, window: Tuple[float, float, float, float] = None, ve
 
         if verbose:
             print(f'...and a final GeoDataFrame of .shape: {temp3.shape}')
+
+        end_time = time.time()
 
         return temp3
 
