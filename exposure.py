@@ -16,6 +16,7 @@ from climateandcompany.generate_asset_level_GEM import (
 
 from climateandcompany.combine_asset_data import (
     combine_asset_datasets
+)
 
 from leaf.deforestation import (
     area,
