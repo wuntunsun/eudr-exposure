@@ -685,7 +685,7 @@ def process_and_save_gem_data():
                         'ownership_operator_name': 'operator_name'}, inplace=True)
     
     # Save output to CSV
-    output_path = os.path.join(PATH_TO_OUTPUT_FOLDER,"asset_level_open_source_gem.csv")
+    output_path = os.path.join(PATH_TO_OUTPUT_FOLDER,"loaded_asset/asset_level_open_source_gem.csv")
     df_gem.to_csv(output_path, index=False)
 
     return df_gem
