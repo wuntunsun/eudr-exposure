@@ -75,7 +75,7 @@ def process_and_save_climate_trace_data(ownership_threshold=10):
     df_climate_trace['uid'] = ['CLT_' + str(num) for num in list(range(len(df_climate_trace)))]
     
     ### SAVE OUTPUT TO CSV
-    output_file_path = os.path.join(PATH_TO_OUTPUT_FOLDER, "asset_level_open_source_climate_trace.csv")
+    output_file_path = os.path.join(PATH_TO_OUTPUT_FOLDER, "loaded_asset/asset_level_open_source_climate_trace.csv")
     df_climate_trace.to_csv(output_file_path, index=False)
     
     return df_climate_trace

@@ -18,6 +18,10 @@ from climateandcompany.combine_asset_data import (
     combine_asset_datasets
 )
 
+from leaf.asset_data_for_ml import (
+    gem_data_for_ml
+)
+
 from leaf.deforestation import (
     area,
     window,
@@ -75,10 +79,13 @@ def main():
             else:
                 print(f'The given location is contained in an area of {result} units.')
         case Command.ASSETS:
-            process_and_save_climate_trace_data()
-            process_and_save_sfi_data()
+            # process_and_save_climate_trace_data()
+            # process_and_save_sfi_data()
             process_and_save_gem_data()
-            combine_asset_datasets()
+
+            # combine_asset_datasets()
+            gem_data_for_ml("data/loaded_asset/asset_level_open_source_gem.csv")
+            
         case Command.CRS:
             gdf = gpd.read_file(geometry)
             print(f'File {geometry} contains CRS: {gdf.crs}')
