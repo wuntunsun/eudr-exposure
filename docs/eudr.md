@@ -12,6 +12,9 @@ Non-SME operators and traders who place, make available or export the following 
 2. https://trase.earth/ - as mentioned in the [Geospatial ESG Report](https://wwfint.awsassets.panda.org/downloads/geospatial_esg_report.pdf)
     - generate insights from incomplete asset data, providing estimates of a company’s supply chain deforestation risk
 
+## Notes
+
+- Spatial finance: practical and theoretical contributions to financial analysis https://www.tandfonline.com/doi/full/10.1080/20430795.2022.2153007
 
 
 
