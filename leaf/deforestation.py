@@ -108,7 +108,7 @@ def to_series(geoTIFF: str, window: Tuple[float, float, float, float] = None, ve
         start_time = time.time()
 
         if verbose:
-            print(src.meta)
+            print(src.profile)
             print(f'crs: {src.crs}')
             print(f'is_epsg_code: {src.crs.is_epsg_code}')
             if src.crs.is_epsg_code:
