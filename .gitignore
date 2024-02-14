@@ -139,3 +139,4 @@ data.zip
 
 # project stuff
 data/geoply-sample.csv
+data/*.tif
