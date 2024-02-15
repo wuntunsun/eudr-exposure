@@ -53,9 +53,9 @@ def main():
         description="""
     Perform a command...\n
     
-    > python -m exposure lossyear -a data/assets_for_deforestation.csv -g data/Hansen_GFC-2022-v1.10_lossyear_20S_060W.tif -d data/assets_with_lossyear.csv -s ','\n
+    > python -m exposure lossyear -a data/assets_for_deforestation.csv -gt data/Hansen_GFC-2022-v1.10_lossyear_20S_060W.tif -d data/assets_with_lossyear.csv -s ','\n
                                                                 
-    > python -m exposure treecover2000 -a data/assets_with_lossyear.csv -g data/Hansen_GFC-2022-v1.10_treecover2000_20S_060W.tif -d data/assets_with_deforestation.csv -s ','\n
+    > python -m exposure treecover2000 -a data/assets_with_lossyear.csv -gt data/Hansen_GFC-2022-v1.10_treecover2000_20S_060W.tif -d data/assets_with_deforestation.csv -s ','\n
 
     Default seperator is , so use -s '\\t' for TAB.
 
