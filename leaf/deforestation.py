@@ -5,6 +5,7 @@ import rasterio as rio
 from rasterio.warp import transform
 from rasterio.windows import Window
 from rasterio.transform import (xy, rowcol)
+from rasterio.coords import BoundingBox
 from rasterio import features
 import rioxarray as rx
 import xarray as xr
@@ -13,6 +14,7 @@ from shapely.geometry import Point
 import itertools as it
 from tqdm import tqdm
 import time
+import math
 
 from typing import Tuple, Optional
 
@@ -216,17 +218,17 @@ def to_lossyear_timeseries(geoTIFF: str, window: Tuple[float, float, float, floa
 
         return temp3
 
+def safe_floor(value: float) -> int:
+    return -1 if math.isnan(value) else math.floor(value)
+
 def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
 
     class Token:
         INDEX = 'uid_gem'
-        VARIABLE = 'lossyear'
         ROW = 'row'
         COL = 'col'
         XDARRAY = 'xdarray'
         TREECOVER2000 = 'treecover2000'
-
-    # TODO: may need to proliferate sep...
 
     def select(row, col, xdarray):
         result = xdarray.isel(x=row, y=col) 
@@ -235,104 +237,132 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
     lookup = np.vectorize(select, excluded=[Token.XDARRAY], cache=False)
 
     assets = pd.read_csv(GEMFile, sep=seperator)
+
+    if verbose:
+        print(f'Of {len(assets)} assets, {assets[Token.INDEX].nunique()} are unique.')
+        print(assets[assets[Token.INDEX].duplicated(keep='first')][Token.INDEX])
+        print(assets[assets.isna().any(axis=1)])
+
+    assert assets[Token.INDEX].nunique() == len(assets)
+    assets = assets.set_index(Token.INDEX)
+
     with rx.open_rasterio(geoTIFF).squeeze() as xda:
-
-        # TODO: should not be needed...
-        #assets.drop_duplicates(Token.INDEX, inplace=True)
-
-        assets = assets.set_index(Token.INDEX)
     
         to_crs = xda.rio.crs
         from_crs = rio.crs.CRS.from_epsg(4326)
         xs, ys = transform(from_crs, to_crs, assets.longitude, assets.latitude)
 
-        rows, cols = rowcol(xda.rio.transform(), xs, ys)
+        rows, cols = rowcol(xda.rio.transform(), xs, ys, op=safe_floor)
         assets[Token.ROW] = rows
         assets[Token.COL] = cols
+        
         # Nota bene: Robert Norris - we may have coordinates beyond the extent of the DataArray
         # TODO: handle Window...
-        local_assets = assets[(assets.row >= 0) & (assets.col >= 0) & (assets.row <= 40000) & (assets.col <= 40000)].copy()
+        local_assets = assets[(assets.row >= 0) & 
+                        (assets.col >= 0) & 
+                        (assets.row <= xda.rio.height) & 
+                        (assets.col <= xda.rio.width)].copy()
     
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
         
+        assert len(np_row) > 0 and  len(np_col) > 0
+
         # Nota bene: Robert Norris - np.vectorize is consistently a little quicker than apply... %timeit 
         result = lookup(row=np_row, col=np_col, xdarray=xda)
 
         local_assets[Token.TREECOVER2000] = pd.Series(result, index=local_assets.index)
 
-    return local_assets
+        mergeable_columns = local_assets.columns.difference(assets.columns)
+        print(mergeable_columns)
+        mergeable_local_assets = local_assets[mergeable_columns]
+        assets_with_treecover2000 = assets.merge(mergeable_local_assets, how='left', validate='one_to_one', left_on=Token.INDEX, right_on=Token.INDEX)
+
+    return assets_with_treecover2000
 
 def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: int = 16, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
 
     class Token:
         INDEX = 'uid_gem'
         VARIABLE = 'lossyear'
-        VALUE = 'percentage'
+        VALUE = 'proportion'
         ROW = 'row'
         COL = 'col'
         XDARRAY = 'xdarray'
-        SIZE = 'size'
+        OFFSET = 'offset'
         REGION = 'region'
 
-    def select(row, col, xdarray, size):
-        s1 = slice(col-size-1, col+size)
-        s2 = slice(row-size-1, row+size)
+    def select(row, col, xdarray, offset):
+        s1 = slice(col-offset-1, col+offset)
+        s2 = slice(row-offset-1, row+offset)
         roi = xdarray.isel(x=s1, y=s2)
         data = np.empty([0,]) if roi.size == 0 else roi.data
         unique, counts = np.unique(data, return_counts=True)
-        percentages = counts / size**2
+        area = (offset*2+1)**2
+        proportions = counts / area
         years = unique + 2000
-        return dict(zip(years, percentages))
+        return dict(zip(years, proportions))
 
-    lookup = np.vectorize(select, excluded=[Token.XDARRAY, Token.SIZE], cache=False)
+    lookup = np.vectorize(select, excluded=[Token.XDARRAY, Token.OFFSET], cache=False)
 
     assets = pd.read_csv(GEMFile, sep=seperator)
-    with rx.open_rasterio(geoTIFF).squeeze() as xda:
-
-        # TODO: should not be needed...
-        assets.drop_duplicates(Token.INDEX, inplace=True)
-
-        assets = assets.set_index(Token.INDEX)
     
-        indices = assets.index.unique()
-        lossyears = range(2001, 2023)
+    if verbose:
+        print(f'Of {len(assets)} assets, {assets[Token.INDEX].nunique()} are unique.')
+        print(assets[assets[Token.INDEX].duplicated(keep='first')][Token.INDEX])
+        print(assets[assets.isna().any(axis=1)])
 
-        index = pd.MultiIndex.from_tuples(tuples=it.product(indices, lossyears), names=(Token.INDEX, Token.VARIABLE))
+    assert assets[Token.INDEX].nunique() == len(assets)
+    assets = assets.set_index(Token.INDEX)
+
+    # Prepare final index
+    indices = assets.index.unique()
+    lossyears = range(2001, 2023)
+    index = pd.MultiIndex.from_tuples(tuples=it.product(indices, lossyears), names=(Token.INDEX, Token.VARIABLE))
+
+    with rx.open_rasterio(geoTIFF).squeeze() as xda:
 
         to_crs = xda.rio.crs
         from_crs = rio.crs.CRS.from_epsg(4326)
         xs, ys = transform(from_crs, to_crs, assets.longitude, assets.latitude)
 
-        rows, cols = rowcol(xda.rio.transform(), xs, ys)
+        rows, cols = rowcol(xda.rio.transform(), xs, ys, op=safe_floor)
+
         assets[Token.ROW] = rows
         assets[Token.COL] = cols
-        # Nota bene: Robert Norris - we may have coordinates beyond the extent of the DataArray
+        
+        # Nota bene: Robert Norris - we may have coordinates beyond the extent of the DataArray,
+        # and have assets within offset of bounds
         # TODO: handle Window...
-        local_assets = assets[(assets.row >= 0) & (assets.col >= 0) & (assets.row <= 40000) & (assets.col <= 40000)].copy()
+        local_assets = assets[(assets.row >= offset) & 
+                        (assets.col >= offset) & 
+                        (assets.row <= xda.rio.height - offset) & 
+                        (assets.col <= xda.rio.width - offset)].copy()
     
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
 
+        assert len(np_row) > 0 and  len(np_col) > 0
+
         # Nota bene: Robert Norris - np.vectorize is consistently a little quicker than apply... %timeit 
-        result = lookup(row=np_row, col=np_col, xdarray=xda, size=offset)
+        result = lookup(row=np_row, col=np_col, xdarray=xda, offset=offset)
 
         local_assets[Token.REGION] = pd.Series(result, index=local_assets.index)
         columns = local_assets.columns.drop(Token.REGION)
         # expand to columns i.e. to wide format... indexed by uid_gem
-        local_assets_lossyears = pd.concat([local_assets[Token.REGION].apply(pd.Series)], axis=1)
+        local_assets_with_lossyears = pd.concat([local_assets[Token.REGION].apply(pd.Series)], axis=1)
 
-        years = local_assets_lossyears.columns
-        foo = pd.melt(local_assets_lossyears, value_vars=years, var_name=Token.VARIABLE, value_name=Token.VALUE, ignore_index=False)
+        years = local_assets_with_lossyears.columns
+        local_assets_per_lossyear = pd.melt(local_assets_with_lossyears, value_vars=years, var_name=Token.VARIABLE, value_name=Token.VALUE, ignore_index=False)
 
-        bar = foo.groupby([Token.INDEX, Token.VARIABLE]).first()
-        bar = bar.reindex(index)
-        bar.fillna(0, inplace=True)
-        bar.reset_index(inplace=True)
+        local_assets_by_lossyear = local_assets_per_lossyear.groupby([Token.INDEX, Token.VARIABLE]).first()
+        local_assets_by_lossyear = local_assets_by_lossyear.reindex(index)
+        local_assets_by_lossyear.fillna(0, inplace=True)
+        local_assets_by_lossyear.reset_index(inplace=True)
 
-        # pivot on uid_gem and 
-        far = bar.pivot(index=Token.INDEX, columns=Token.VARIABLE, values=Token.VALUE)
-        # combine far with local_assets based on index...
-        local_assets_with_lossyears = pd.merge(local_assets, far, validate='one_to_one', left_on=Token.INDEX, right_on=Token.INDEX)
+        local_assets = local_assets_by_lossyear.pivot(index=Token.INDEX, columns=Token.VARIABLE, values=Token.VALUE)
+        mergeable_columns = local_assets.columns.difference(assets.columns)
+        mergeable_local_assets = local_assets[mergeable_columns]
+        assets_with_lossyear = assets.merge(mergeable_local_assets, how='left', validate='one_to_one', left_on=Token.INDEX, right_on=Token.INDEX)
 
-    return local_assets_with_lossyears
+    return assets_with_lossyear
