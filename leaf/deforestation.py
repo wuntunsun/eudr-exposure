@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+import requests
 import rasterio as rio
 from rasterio.warp import transform
 from rasterio.windows import Window
@@ -11,15 +12,28 @@ import rioxarray as rx
 import xarray as xr
 from shapely.geometry import Polygon
 from shapely.geometry import Point
+from string import Template
 import itertools as it
 from tqdm import tqdm
 import time
 import math
+import os
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 def closest_index(gdf: gpd.GeoDataFrame, lat: float, long: float, year: int, verbose: bool = False) -> Tuple[float, int]:
+    """_summary_
 
+    Args:
+        gdf (gpd.GeoDataFrame): _description_
+        lat (float): _description_
+        long (float): _description_
+        year (int): _description_
+        verbose (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        Tuple[float, int]: _description_
+    """
     if verbose:
         print(f'location: [{lat}, {long}]')
 
@@ -35,7 +49,6 @@ def window(gdf: gpd.GeoDataFrame) -> Tuple[float, float, float, float]:
     Returns:
         Tuple[float, float, float, float]: minx, miny, maxx, maxy
     """
-
     minx, miny, maxx, maxy = gdf.total_bounds
 
     from_crs = gdf.crs
@@ -59,7 +72,6 @@ def area(gdf: gpd.GeoDataFrame, lat: float, long: float, year: int, verbose: boo
     Returns:
         Optional[float]: The 'area' in EPSG:4326 or None if 'area' is missing or location does not match.
     """
-
     to_crs = gdf.crs
     from_crs = rio.crs.CRS.from_epsg(4326)
     x, y = transform(from_crs, to_crs, [long], [lat])
@@ -90,7 +102,6 @@ def to_lossyear_timeseries(geoTIFF: str, window: Tuple[float, float, float, floa
     Returns:
         gpd.GeoDataFrame: _description_
     """
-
     # TODO: handle geoTIFF with multiple bands
 
     BAND_INDEX = 1
@@ -219,10 +230,29 @@ def to_lossyear_timeseries(geoTIFF: str, window: Tuple[float, float, float, floa
         return temp3
 
 def safe_floor(value: float) -> int:
+    """_summary_
+
+    Args:
+        value (float): _description_
+
+    Returns:
+        int: _description_
+    """
     return -1 if math.isnan(value) else math.floor(value)
 
 def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
+    """_summary_
 
+    Args:
+        geoTIFF (str): _description_
+        GEMFile (str): _description_
+        seperator (str): _description_
+        window (Tuple[float, float, float, float], optional): _description_. Defaults to None.
+        verbose (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     class Token:
         INDEX = 'uid_gem'
         ROW = 'row'
@@ -288,7 +318,19 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
     return assets
 
 def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: int = 16, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
+    """_summary_
 
+    Args:
+        geoTIFF (str): _description_
+        GEMFile (str): _description_
+        seperator (str): _description_
+        offset (int, optional): _description_. Defaults to 16.
+        window (Tuple[float, float, float, float], optional): _description_. Defaults to None.
+        verbose (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     class Token:
         INDEX = 'uid_gem'
         VARIABLE = 'lossyear'
@@ -381,3 +423,111 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         assets.update(local_assets)
 
     return assets
+
+
+def to_degrees(lat: int, long: int, step: int = 10) -> Tuple[str, str]:
+    """ Convert latitude and longitude to degrees of the form e.g. ('020S', '50W').
+
+    Positive latitudes are north of the equator, negative latitudes are south of the equator. 
+    Positive longitudes are east of the Prime Meridian; negative longitudes are west of the Prime Meridian.
+
+    Args:
+        lat (int): A latitude value.
+        long (int): A longitude value.
+        step (int, optional): Step in degrees. Defaults to 10.
+
+    Returns:
+        Tuple[str, str]: Degrees of the form e.g. ('020S', '50N').
+    """
+    div_lat, mod_lat = divmod(lat, step)
+    div_long, mod_long = divmod(long, step)
+    clat = div_lat * step if mod_lat == 0 else (div_lat + 1) * step
+    clong = div_long * step if mod_long == 0 else (div_long) * step
+    slat = 'S' if clat <= 0 else 'N'
+    slong = 'E' if clong > 0 else 'W'
+    return (f'{abs(clat):>02}' + slat, f'{abs(clong):>03}' + slong)
+
+def download_file(url, path):
+    """_summary_
+
+    Args:
+        url (_type_): _description_
+        path (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        with open(path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192): 
+                f.write(chunk)
+    return path
+
+def cache(data: str, files: List[str], base_url: str):
+    """_summary_
+
+    Args:
+        data (str): _description_
+        files (List[str]): _description_
+        base_url (str): _description_
+    """
+    for file in files:
+        path = f'{data}/{file}'
+        if os.path.isfile(path):
+            print(f'Located {path}')
+        else:
+            url = f'{base_url}/{file}'
+            print(f'Downloading {url} to {path}')
+            download_file(url, path)
+
+def cache_earthenginepartners_hansen(latitudes: range, longitudes: range, data: str = 'data') -> dict:
+    """_summary_
+
+    Args:
+        latitudes (range): _description_
+        longitudes (range): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    def file(layer: str, lat: int, long: int) -> str:
+        slat, slong = to_degrees(lat, long)
+        t = Template('Hansen_GFC-2022-v1.10_${layer}_${lat}_${long}.tif')
+        return t.substitute({'layer': layer, 'lat': slat, 'long': slong})
+
+    def files(layers: List[str], latitudes: range, longitudes: range) -> dict:
+        layers = {}
+        permutations = it.product(latitudes, longitudes)
+        for layer in layers:
+            layers[layer] = [file(layer, lat, long) for (lat, long) in permutations]
+        return layers
+
+    layers = files(['lossyear', 'treecover2000'], latitudes, longitudes)
+    for _, files in layers.items():
+        cache(data, files, 'https://storage.googleapis.com/earthenginepartners-hansen/GFC-2022-v1.10')
+    
+    return layers
+
+def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, longitudes: range, data: str = 'data'):
+    layers = cache_earthenginepartners_hansen(latitudes, longitudes, data)
+    # TODO: it needs to wait for cache_earthenginepartners_hansen...
+    lossyears = layers['lossyear']
+    treecover2000 = layers['treecover2000']
+
+    temp = f'{data}/hansen.csv'
+
+    for lossyear in lossyears:
+        df = to_assets_with_lossyear(f'{data}/{lossyear}', GEMFile, seperator, 16)
+        df.to_csv(temp, sep=seperator, mode='a')
+
+    for treecover2000 in treecover2000:
+        df = to_assets_with_treecover2000(f'{data}/{treecover2000}', temp, seperator)
+        df.to_csv(temp, sep=seperator, mode='a')
+
+    os.rename(temp, f'{data}/hansen.csv')
+
+
+        
+
+
