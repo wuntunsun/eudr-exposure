@@ -239,6 +239,7 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
     assets = pd.read_csv(GEMFile, sep=seperator)
 
     if verbose:
+        print(f'{GEMFile}')
         print(f'Of {len(assets)} assets, {assets[Token.INDEX].nunique()} are unique.')
         print(assets[assets[Token.INDEX].duplicated(keep='first')][Token.INDEX])
         print(assets[assets.isna().any(axis=1)])
@@ -248,6 +249,12 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
 
     with rx.open_rasterio(geoTIFF).squeeze() as xda:
     
+        if verbose:
+            print(f'{geoTIFF}')
+            print(xda)
+            unique, counts = np.unique(xda.data, return_counts=True)
+            print(dict(zip(unique, counts)))
+
         to_crs = xda.rio.crs
         from_crs = rio.crs.CRS.from_epsg(4326)
         xs, ys = transform(from_crs, to_crs, assets.longitude, assets.latitude)
@@ -274,11 +281,11 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
         local_assets[Token.TREECOVER2000] = pd.Series(result, index=local_assets.index)
 
         mergeable_columns = local_assets.columns.difference(assets.columns)
-        print(mergeable_columns)
         mergeable_local_assets = local_assets[mergeable_columns]
-        assets_with_treecover2000 = assets.merge(mergeable_local_assets, how='left', validate='one_to_one', left_on=Token.INDEX, right_on=Token.INDEX)
+        assets = assets.merge(mergeable_local_assets, how='left', validate='one_to_one', left_on=Token.INDEX, right_on=Token.INDEX)
+        assets.update(local_assets)
 
-    return assets_with_treecover2000
+    return assets
 
 def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: int = 16, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
 
@@ -308,6 +315,7 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
     assets = pd.read_csv(GEMFile, sep=seperator)
     
     if verbose:
+        print(f'{GEMFile}')
         print(f'Of {len(assets)} assets, {assets[Token.INDEX].nunique()} are unique.')
         print(assets[assets[Token.INDEX].duplicated(keep='first')][Token.INDEX])
         print(assets[assets.isna().any(axis=1)])
@@ -321,6 +329,12 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
     index = pd.MultiIndex.from_tuples(tuples=it.product(indices, lossyears), names=(Token.INDEX, Token.VARIABLE))
 
     with rx.open_rasterio(geoTIFF).squeeze() as xda:
+
+        if verbose:
+            print(f'{geoTIFF}')
+            print(xda)
+            unique, counts = np.unique(xda.data, return_counts=True)
+            print(dict(zip(unique, counts)))
 
         to_crs = xda.rio.crs
         from_crs = rio.crs.CRS.from_epsg(4326)
@@ -363,6 +377,7 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         local_assets = local_assets_by_lossyear.pivot(index=Token.INDEX, columns=Token.VARIABLE, values=Token.VALUE)
         mergeable_columns = local_assets.columns.difference(assets.columns)
         mergeable_local_assets = local_assets[mergeable_columns]
-        assets_with_lossyear = assets.merge(mergeable_local_assets, how='left', validate='one_to_one', left_on=Token.INDEX, right_on=Token.INDEX)
+        assets = assets.merge(mergeable_local_assets, how='left', validate='one_to_one', left_on=Token.INDEX, right_on=Token.INDEX)
+        assets.update(local_assets)
 
-    return assets_with_lossyear
+    return assets
