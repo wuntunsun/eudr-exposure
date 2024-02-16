@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
+
 import geopandas as gpd
-import requests
 import rasterio as rio
 from rasterio.warp import transform
 from rasterio.windows import Window
@@ -12,12 +12,20 @@ import rioxarray as rx
 import xarray as xr
 from shapely.geometry import Polygon
 from shapely.geometry import Point
+
+from concurrent.futures import (ThreadPoolExecutor, wait)
+import requests
+import threading
+
 from string import Template
 import itertools as it
+from functools import partial
 from tqdm import tqdm
 import time
 import math
 import os
+import shutil
+
 
 from typing import Tuple, Optional, List
 
@@ -199,7 +207,7 @@ def to_lossyear_timeseries(geoTIFF: str, window: Tuple[float, float, float, floa
         dissolve_time = time.time()
 
         group_ids = temp2.index.get_level_values(0).unique()
-        lossyears = range(2001, 2023)
+        lossyears = map(str, range(2001, 2023))
 
         index = pd.MultiIndex.from_tuples(tuples=it.product(group_ids, lossyears), names=(Token.GROUP_ID, Token.VARIABLE))
         temp3 = temp2.reindex(index)
@@ -272,7 +280,7 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
         print(f'{GEMFile}')
         print(f'Of {len(assets)} assets, {assets[Token.INDEX].nunique()} are unique.')
         print(assets[assets[Token.INDEX].duplicated(keep='first')][Token.INDEX])
-        print(assets[assets.isna().any(axis=1)])
+        #print(assets[assets.isna().any(axis=1)])
 
     assert assets[Token.INDEX].nunique() == len(assets)
     assets = assets.set_index(Token.INDEX)
@@ -303,7 +311,11 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
         
-        assert len(np_row) > 0 and  len(np_col) > 0
+        if verbose:
+            print(f'{len(np_row)} {len(np_col)}')
+
+        if len(np_row) == 0 or len(np_col) == 0:
+            return assets
 
         # Nota bene: Robert Norris - np.vectorize is consistently a little quicker than apply... %timeit 
         result = lookup(row=np_row, col=np_col, xdarray=xda)
@@ -350,7 +362,7 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         area = (offset*2+1)**2
         proportions = counts / area
         years = unique + 2000
-        return dict(zip(years, proportions))
+        return dict(zip(years.astype(str), proportions))
 
     lookup = np.vectorize(select, excluded=[Token.XDARRAY, Token.OFFSET], cache=False)
 
@@ -360,14 +372,14 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         print(f'{GEMFile}')
         print(f'Of {len(assets)} assets, {assets[Token.INDEX].nunique()} are unique.')
         print(assets[assets[Token.INDEX].duplicated(keep='first')][Token.INDEX])
-        print(assets[assets.isna().any(axis=1)])
+        #print(assets[assets.isna().any(axis=1)])
 
     assert assets[Token.INDEX].nunique() == len(assets)
     assets = assets.set_index(Token.INDEX)
 
     # Prepare final index
     indices = assets.index.unique()
-    lossyears = range(2001, 2023)
+    lossyears = map(str, range(2001, 2023))
     index = pd.MultiIndex.from_tuples(tuples=it.product(indices, lossyears), names=(Token.INDEX, Token.VARIABLE))
 
     with rx.open_rasterio(geoTIFF).squeeze() as xda:
@@ -398,7 +410,12 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
 
-        assert len(np_row) > 0 and  len(np_col) > 0
+        if verbose:
+            if len(np_row) == 0 or len(np_col) == 0:
+                print(f'No assets match to {geoTIFF}')
+
+        if len(np_row) == 0 or len(np_col) == 0:
+            return assets
 
         # Nota bene: Robert Norris - np.vectorize is consistently a little quicker than apply... %timeit 
         result = lookup(row=np_row, col=np_col, xdarray=xda, offset=offset)
@@ -447,41 +464,52 @@ def to_degrees(lat: int, long: int, step: int = 10) -> Tuple[str, str]:
     slong = 'E' if clong > 0 else 'W'
     return (f'{abs(clat):>02}' + slat, f'{abs(clong):>03}' + slong)
 
-def download_file(url, path):
+def download_file(session: requests.Session, url, path, verbose: bool = False) -> str:
     """_summary_
 
     Args:
+        session (requests.Session): _description_
         url (_type_): _description_
         path (_type_): _description_
 
     Returns:
-        _type_: _description_
+        str: _description_
     """
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
+
+    if verbose:
+        print(f'download_file {path} from {url}')
+
+    with session.get(url, stream=False) as response:
+        response.raise_for_status()
         with open(path, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192): 
+            for chunk in response.iter_content(chunk_size=8192): 
                 f.write(chunk)
+
     return path
 
-def cache(data: str, files: List[str], base_url: str):
+def cache(session: requests.Session, root: str, files: List[str], base_url: str, verbose: bool = False):
     """_summary_
 
     Args:
+        session (requests.Session): _description_
         data (str): _description_
         files (List[str]): _description_
         base_url (str): _description_
     """
-    for file in files:
-        path = f'{data}/{file}'
-        if os.path.isfile(path):
-            print(f'Located {path}')
-        else:
-            url = f'{base_url}/{file}'
-            print(f'Downloading {url} to {path}')
-            download_file(url, path)
+    missing = [(f'{base_url}/{file}', f'{root}/{file}') for file in files if not os.path.isfile(f'{root}/{file}')]
+    #urls = [f'{base_url}/{file}' for file in files if not os.path.isfile(f'{root}/{file}')]
+    #locals = [f'{root}/{file}' for file in files if not os.path.isfile(f'{root}/{file}')]
 
-def cache_earthenginepartners_hansen(latitudes: range, longitudes: range, data: str = 'data') -> dict:
+    #session_download_file = partial(download_file, session=session, verbose=verbose)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for url, file in missing:
+            future = executor.submit(download_file, session=session, url=url, path=file, verbose=verbose)
+            _ = future.result()
+        #TODO why was the map a problem?
+        #for result in executor.map(session_download_file, urls, locals):
+            #print(f'submit {result}')
+
+def cache_earthenginepartners_hansen(latitudes: range, longitudes: range, root: str = 'data', verbose: bool = False) -> dict:
     """_summary_
 
     Args:
@@ -494,39 +522,47 @@ def cache_earthenginepartners_hansen(latitudes: range, longitudes: range, data: 
     def file(layer: str, lat: int, long: int) -> str:
         slat, slong = to_degrees(lat, long)
         t = Template('Hansen_GFC-2022-v1.10_${layer}_${lat}_${long}.tif')
-        return t.substitute({'layer': layer, 'lat': slat, 'long': slong})
+        filename = t.substitute({'layer': layer, 'lat': slat, 'long': slong})
+        return filename
 
     def files(layers: List[str], latitudes: range, longitudes: range) -> dict:
-        layers = {}
-        permutations = it.product(latitudes, longitudes)
+        files_per_layer = {}
+        permutations = list(it.product(latitudes, longitudes))
         for layer in layers:
-            layers[layer] = [file(layer, lat, long) for (lat, long) in permutations]
-        return layers
+            files_per_layer[layer] = [file(layer, lat, long) for (lat, long) in permutations]
+        return files_per_layer
+
+    thread_local = threading.local()
+    thread_local.session = requests.Session()
 
     layers = files(['lossyear', 'treecover2000'], latitudes, longitudes)
     for _, files in layers.items():
-        cache(data, files, 'https://storage.googleapis.com/earthenginepartners-hansen/GFC-2022-v1.10')
-    
+        cache(thread_local.session, root, files, 'https://storage.googleapis.com/earthenginepartners-hansen/GFC-2022-v1.10', verbose=verbose)
+
     return layers
 
-def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, longitudes: range, data: str = 'data'):
-    layers = cache_earthenginepartners_hansen(latitudes, longitudes, data)
+def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, longitudes: range, data: str, root: str = 'data', verbose: bool = False):
+
+    layers = cache_earthenginepartners_hansen(latitudes, longitudes, root, verbose=verbose)
+    
     # TODO: it needs to wait for cache_earthenginepartners_hansen...
+
     lossyears = layers['lossyear']
     treecover2000 = layers['treecover2000']
 
-    temp = f'{data}/hansen.csv'
+    # TODO: use a temporary file that the os chooses...
+    temp = f'{root}/earthenginepartners_hansen.csv'
+    shutil.copyfile(GEMFile, temp)
 
     for lossyear in lossyears:
-        df = to_assets_with_lossyear(f'{data}/{lossyear}', GEMFile, seperator, 16)
-        df.to_csv(temp, sep=seperator, mode='a')
+        df = to_assets_with_lossyear(f'{root}/{lossyear}', temp, seperator, 16, verbose = verbose)
+        df.to_csv(temp, sep=seperator)
 
     for treecover2000 in treecover2000:
-        df = to_assets_with_treecover2000(f'{data}/{treecover2000}', temp, seperator)
-        df.to_csv(temp, sep=seperator, mode='a')
+        df = to_assets_with_treecover2000(f'{root}/{treecover2000}', temp, seperator, verbose = verbose)
+        df.to_csv(temp, sep=seperator)
 
-    os.rename(temp, f'{data}/hansen.csv')
-
+    shutil.move(temp, data)
 
         
 
