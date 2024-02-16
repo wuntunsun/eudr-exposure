@@ -55,7 +55,7 @@ def gem_data_for_ml(gem_data):
     # step 2: keep non-changing information about each asset
 
     invariant_cols = ['latitude', 'longitude', 'uid_gem', 'sector_main', 'sector_main_num', 
-                'capacity_unit', 'country']
+                'capacity_unit', 'country', 'asset_name', 'owner_name']
 
     df_gem_invariant = df_gem[invariant_cols].drop_duplicates('uid_gem', keep='first')
 
@@ -70,7 +70,7 @@ def gem_data_for_ml(gem_data):
 
     # check lenght of data 
     assert(len(df_gem) == df_gem.uid_gem.nunique())
-
+    
     # export data
     df_gem.to_csv('data/assets_for_deforestation.csv', index=False, sep='\t', encoding='utf-8')
 
