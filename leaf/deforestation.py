@@ -381,3 +381,65 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         assets.update(local_assets)
 
     return assets
+
+
+def to_reg_sample(data, separator = "\t", max_year = 7): 
+
+    df = pd.read_csv(data, sep = separator)
+
+    # rename year columns to have a prefix
+    rename_aux = {str(x): "deforestation_"+str(x) for x in range(2000, 2023)}
+    df.rename(columns = rename_aux, inplace = True)
+
+    # get columns which are not about deforstation
+    i_cols = [col for col in df.columns if not col.startswith('deforestation_')]
+
+    # reshape
+    df = pd.wide_to_long(df, "deforestation_", i = i_cols, j = 'year').reset_index()
+
+    # convert start year to integer
+    df['start_year_first'] = df.start_year_first.astype(int)
+    
+    # function to create year indicators around start-year of asset
+    def year_var(n):
+        return lambda x: 1 if x.year in range(x.start_year_first - math.floor(n/2), x.start_year_first + math.ceil(n/2)) else 0
+
+    for i in list(range(1, max_year + 1, 2)): 
+        var = 'y' + str(i)
+        df[var] = df.apply(year_var(i), axis = 1)
+
+    # function to get the deforestation for specific time windows
+    def defo_var(n): 
+        var = 'y' + str(n)
+        return lambda x: x.deforestation_ if x[var] == 1 else 0
+
+    for i in list(range(1, max_year + 1, 2)): 
+        var = 'defo_y' + str(i)
+        df[var] = df.apply(defo_var(i), axis = 1)
+
+    # aggregate on uid_gem level (step-wise to prevent losing observations)
+    sum_cols = [x for x in df.columns if x not in i_cols and x != 'year'] + ['uid_gem']
+    sum_cols
+
+    df_group = df[sum_cols].groupby('uid_gem').sum().rename(columns = {'deforestation_': 'defo_total'}).reset_index()
+    df_group.uid_gem.nunique()
+
+    df_invariant = df[i_cols].groupby('uid_gem').agg('first').reset_index()
+    df_invariant.uid_gem.nunique()
+
+    df = pd.merge(df_invariant, df_group, how = 'inner', on = 'uid_gem')
+
+    # replace with nans the defo_ vars where there are not enough periods
+    def defo_fix(n): 
+        var_yr = 'y' + str(n)
+        var_defo = 'defo_' + var_yr
+        return lambda x: np.nan if x[var_yr] < n else x[var_defo]
+
+    for i in list(range(1, max_year + 1, 2)): 
+        var = 'defo_y' + str(i)
+        df[var] = df.apply(defo_fix(i), axis = 1)
+
+    # save output 
+    df.to_csv('data/regression_sample.csv', index=False, sep='\t', encoding='utf-8')
+
+    return df
