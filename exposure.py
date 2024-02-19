@@ -24,6 +24,7 @@ from leaf.asset_data_for_ml import (
 
 from leaf.deforestation import (
     area,
+    to_reg_sample,
     window,
     to_lossyear_timeseries,
     to_assets_with_lossyear,
@@ -40,6 +41,7 @@ def main():
         ASSETS_WITH_LOSSYEAR = 'lossyear'
         ASSETS_WITH_TREECOVER2000 = 'treecover2000'
         WINDOW = 'window'
+        REG_SAMPLE = 'reg_sample'
 
     commands = [Command.AREA, 
                 Command.ASSETS, 
@@ -47,7 +49,8 @@ def main():
                 Command.LOSSYEAR_TIMESERIES, 
                 Command.ASSETS_WITH_LOSSYEAR, 
                 Command.ASSETS_WITH_TREECOVER2000, 
-                Command.WINDOW]
+                Command.WINDOW, 
+                Command.REG_SAMPLE]
     parser=argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""
@@ -135,6 +138,8 @@ def main():
             gdf = gpd.read_file(geometry)
             result = window(gdf)
             print(f'File {geometry} contains Window: {result}')
+        case Command.REG_SAMPLE:
+            to_reg_sample("data/assets_with_deforestation.csv")
 
 
 if __name__ == '__main__':
