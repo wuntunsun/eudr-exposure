@@ -509,6 +509,7 @@ def cache(session: requests.Session, root: str, files: List[str], base_url: str,
         #for result in executor.map(session_download_file, urls, locals):
             #print(f'submit {result}')
 
+
 def cache_earthenginepartners_hansen(latitudes: range, longitudes: range, root: str = 'data', verbose: bool = False) -> dict:
     """_summary_
 
