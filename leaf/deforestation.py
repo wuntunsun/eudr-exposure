@@ -459,7 +459,7 @@ def to_degrees(lat: int, long: int, step: int = 10) -> Tuple[str, str]:
     div_long, mod_long = divmod(long, step)
     clat = div_lat * step if mod_lat == 0 else (div_lat + 1) * step
     clong = div_long * step if mod_long == 0 else (div_long) * step
-    slat = 'S' if clat <= 0 else 'N'
+    slat = 'S' if clat < 0 else 'N'
     slong = 'E' if clong > 0 else 'W'
     return (f'{abs(clat):>02}' + slat, f'{abs(clong):>03}' + slong)
 
@@ -536,7 +536,7 @@ def cache_earthenginepartners_hansen(latitudes: range, longitudes: range, root: 
     thread_local.session = requests.Session()
 
     layers = files(['lossyear', 'treecover2000'], latitudes, longitudes)
-    for _, files in layers.items():
+    for _, files in tqdm(layers.items(), desc='Cache missing files'):
         cache(thread_local.session, root, files, 'https://storage.googleapis.com/earthenginepartners-hansen/GFC-2022-v1.10', verbose=verbose)
 
     return layers
