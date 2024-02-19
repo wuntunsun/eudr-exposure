@@ -305,8 +305,8 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
         # TODO: handle Window...
         local_assets = assets[(assets.row >= 0) & 
                         (assets.col >= 0) & 
-                        (assets.row <= xda.rio.height) & 
-                        (assets.col <= xda.rio.width)].copy()
+                        (assets.row < xda.rio.height) & 
+                        (assets.col < xda.rio.width)].copy()
     
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
@@ -404,8 +404,8 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         # TODO: handle Window...
         local_assets = assets[(assets.row >= offset) & 
                         (assets.col >= offset) & 
-                        (assets.row <= xda.rio.height - offset) & 
-                        (assets.col <= xda.rio.width - offset)].copy()
+                        (assets.row < xda.rio.height - offset) & 
+                        (assets.col < xda.rio.width - offset)].copy()
     
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
@@ -545,8 +545,6 @@ def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, l
 
     layers = cache_earthenginepartners_hansen(latitudes, longitudes, root, verbose=verbose)
     
-    # TODO: it needs to wait for cache_earthenginepartners_hansen...
-
     lossyears = layers['lossyear']
     treecover2000 = layers['treecover2000']
 
@@ -554,11 +552,11 @@ def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, l
     temp = f'{root}/earthenginepartners_hansen.csv'
     shutil.copyfile(GEMFile, temp)
 
-    for lossyear in lossyears:
+    for lossyear in tqdm(lossyears, desc=f'to_assets_with_lossyear for latitudes: {latitudes} and longitudes: {longitudes}'):
         df = to_assets_with_lossyear(f'{root}/{lossyear}', temp, seperator, 16, verbose = verbose)
         df.to_csv(temp, sep=seperator)
 
-    for treecover2000 in treecover2000:
+    for treecover2000 in tqdm(treecover2000, desc=f'to_assets_with_treecover2000 for latitudes: {latitudes} and longitudes: {longitudes}'):
         df = to_assets_with_treecover2000(f'{root}/{treecover2000}', temp, seperator, verbose = verbose)
         df.to_csv(temp, sep=seperator)
 
