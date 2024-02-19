@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+
 import geopandas as gpd
 import rasterio as rio
 from rasterio.warp import transform
@@ -11,15 +12,36 @@ import rioxarray as rx
 import xarray as xr
 from shapely.geometry import Polygon
 from shapely.geometry import Point
+
+from concurrent.futures import (ThreadPoolExecutor, wait)
+import requests
+import threading
+
+from string import Template
 import itertools as it
+from functools import partial
 from tqdm import tqdm
 import time
 import math
+import os
+import shutil
 
-from typing import Tuple, Optional
+
+from typing import Tuple, Optional, List
 
 def closest_index(gdf: gpd.GeoDataFrame, lat: float, long: float, year: int, verbose: bool = False) -> Tuple[float, int]:
+    """_summary_
 
+    Args:
+        gdf (gpd.GeoDataFrame): _description_
+        lat (float): _description_
+        long (float): _description_
+        year (int): _description_
+        verbose (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        Tuple[float, int]: _description_
+    """
     if verbose:
         print(f'location: [{lat}, {long}]')
 
@@ -35,7 +57,6 @@ def window(gdf: gpd.GeoDataFrame) -> Tuple[float, float, float, float]:
     Returns:
         Tuple[float, float, float, float]: minx, miny, maxx, maxy
     """
-
     minx, miny, maxx, maxy = gdf.total_bounds
 
     from_crs = gdf.crs
@@ -59,7 +80,6 @@ def area(gdf: gpd.GeoDataFrame, lat: float, long: float, year: int, verbose: boo
     Returns:
         Optional[float]: The 'area' in EPSG:4326 or None if 'area' is missing or location does not match.
     """
-
     to_crs = gdf.crs
     from_crs = rio.crs.CRS.from_epsg(4326)
     x, y = transform(from_crs, to_crs, [long], [lat])
@@ -90,7 +110,6 @@ def to_lossyear_timeseries(geoTIFF: str, window: Tuple[float, float, float, floa
     Returns:
         gpd.GeoDataFrame: _description_
     """
-
     # TODO: handle geoTIFF with multiple bands
 
     BAND_INDEX = 1
@@ -188,7 +207,7 @@ def to_lossyear_timeseries(geoTIFF: str, window: Tuple[float, float, float, floa
         dissolve_time = time.time()
 
         group_ids = temp2.index.get_level_values(0).unique()
-        lossyears = range(2001, 2023)
+        lossyears = map(str, range(2001, 2023))
 
         index = pd.MultiIndex.from_tuples(tuples=it.product(group_ids, lossyears), names=(Token.GROUP_ID, Token.VARIABLE))
         temp3 = temp2.reindex(index)
@@ -219,10 +238,29 @@ def to_lossyear_timeseries(geoTIFF: str, window: Tuple[float, float, float, floa
         return temp3
 
 def safe_floor(value: float) -> int:
+    """_summary_
+
+    Args:
+        value (float): _description_
+
+    Returns:
+        int: _description_
+    """
     return -1 if math.isnan(value) else math.floor(value)
 
 def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
+    """_summary_
 
+    Args:
+        geoTIFF (str): _description_
+        GEMFile (str): _description_
+        seperator (str): _description_
+        window (Tuple[float, float, float, float], optional): _description_. Defaults to None.
+        verbose (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     class Token:
         INDEX = 'uid_gem'
         ROW = 'row'
@@ -242,7 +280,7 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
         print(f'{GEMFile}')
         print(f'Of {len(assets)} assets, {assets[Token.INDEX].nunique()} are unique.')
         print(assets[assets[Token.INDEX].duplicated(keep='first')][Token.INDEX])
-        print(assets[assets.isna().any(axis=1)])
+        #print(assets[assets.isna().any(axis=1)])
 
     assert assets[Token.INDEX].nunique() == len(assets)
     assets = assets.set_index(Token.INDEX)
@@ -273,7 +311,11 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
         
-        assert len(np_row) > 0 and  len(np_col) > 0
+        if verbose:
+            print(f'{len(np_row)} {len(np_col)}')
+
+        if len(np_row) == 0 or len(np_col) == 0:
+            return assets
 
         # Nota bene: Robert Norris - np.vectorize is consistently a little quicker than apply... %timeit 
         result = lookup(row=np_row, col=np_col, xdarray=xda)
@@ -288,7 +330,19 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
     return assets
 
 def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: int = 16, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
+    """_summary_
 
+    Args:
+        geoTIFF (str): _description_
+        GEMFile (str): _description_
+        seperator (str): _description_
+        offset (int, optional): _description_. Defaults to 16.
+        window (Tuple[float, float, float, float], optional): _description_. Defaults to None.
+        verbose (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        pd.DataFrame: _description_
+    """
     class Token:
         INDEX = 'uid_gem'
         VARIABLE = 'lossyear'
@@ -308,7 +362,7 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         area = (offset*2+1)**2
         proportions = counts / area
         years = unique + 2000
-        return dict(zip(years, proportions))
+        return dict(zip(years.astype(str), proportions))
 
     lookup = np.vectorize(select, excluded=[Token.XDARRAY, Token.OFFSET], cache=False)
 
@@ -318,14 +372,14 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         print(f'{GEMFile}')
         print(f'Of {len(assets)} assets, {assets[Token.INDEX].nunique()} are unique.')
         print(assets[assets[Token.INDEX].duplicated(keep='first')][Token.INDEX])
-        print(assets[assets.isna().any(axis=1)])
+        #print(assets[assets.isna().any(axis=1)])
 
     assert assets[Token.INDEX].nunique() == len(assets)
     assets = assets.set_index(Token.INDEX)
 
     # Prepare final index
     indices = assets.index.unique()
-    lossyears = range(2001, 2023)
+    lossyears = map(str, range(2001, 2023))
     index = pd.MultiIndex.from_tuples(tuples=it.product(indices, lossyears), names=(Token.INDEX, Token.VARIABLE))
 
     with rx.open_rasterio(geoTIFF).squeeze() as xda:
@@ -356,7 +410,12 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
 
-        assert len(np_row) > 0 and  len(np_col) > 0
+        if verbose:
+            if len(np_row) == 0 or len(np_col) == 0:
+                print(f'No assets match to {geoTIFF}')
+
+        if len(np_row) == 0 or len(np_col) == 0:
+            return assets
 
         # Nota bene: Robert Norris - np.vectorize is consistently a little quicker than apply... %timeit 
         result = lookup(row=np_row, col=np_col, xdarray=xda, offset=offset)
@@ -382,6 +441,128 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
 
     return assets
 
+def to_degrees(lat: int, long: int, step: int = 10) -> Tuple[str, str]:
+    """ Convert latitude and longitude to degrees of the form e.g. ('020S', '50W').
+
+    Positive latitudes are north of the equator, negative latitudes are south of the equator. 
+    Positive longitudes are east of the Prime Meridian; negative longitudes are west of the Prime Meridian.
+
+    Args:
+        lat (int): A latitude value.
+        long (int): A longitude value.
+        step (int, optional): Step in degrees. Defaults to 10.
+
+    Returns:
+        Tuple[str, str]: Degrees of the form e.g. ('020S', '50N').
+    """
+    div_lat, mod_lat = divmod(lat, step)
+    div_long, mod_long = divmod(long, step)
+    clat = div_lat * step if mod_lat == 0 else (div_lat + 1) * step
+    clong = div_long * step if mod_long == 0 else (div_long) * step
+    slat = 'S' if clat <= 0 else 'N'
+    slong = 'E' if clong > 0 else 'W'
+    return (f'{abs(clat):>02}' + slat, f'{abs(clong):>03}' + slong)
+
+def download_file(session: requests.Session, url, path, verbose: bool = False) -> str:
+    """_summary_
+
+    Args:
+        session (requests.Session): _description_
+        url (_type_): _description_
+        path (_type_): _description_
+
+    Returns:
+        str: _description_
+    """
+
+    if verbose:
+        print(f'download_file {path} from {url}')
+
+    with session.get(url, stream=False) as response:
+        response.raise_for_status()
+        with open(path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192): 
+                f.write(chunk)
+
+    return path
+
+def cache(session: requests.Session, root: str, files: List[str], base_url: str, verbose: bool = False):
+    """_summary_
+
+    Args:
+        session (requests.Session): _description_
+        data (str): _description_
+        files (List[str]): _description_
+        base_url (str): _description_
+    """
+    missing = [(f'{base_url}/{file}', f'{root}/{file}') for file in files if not os.path.isfile(f'{root}/{file}')]
+    #urls = [f'{base_url}/{file}' for file in files if not os.path.isfile(f'{root}/{file}')]
+    #locals = [f'{root}/{file}' for file in files if not os.path.isfile(f'{root}/{file}')]
+
+    #session_download_file = partial(download_file, session=session, verbose=verbose)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for url, file in missing:
+            future = executor.submit(download_file, session=session, url=url, path=file, verbose=verbose)
+            _ = future.result()
+        #TODO why was the map a problem?
+        #for result in executor.map(session_download_file, urls, locals):
+            #print(f'submit {result}')
+
+
+def cache_earthenginepartners_hansen(latitudes: range, longitudes: range, root: str = 'data', verbose: bool = False) -> dict:
+    """_summary_
+
+    Args:
+        latitudes (range): _description_
+        longitudes (range): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    def file(layer: str, lat: int, long: int) -> str:
+        slat, slong = to_degrees(lat, long)
+        t = Template('Hansen_GFC-2022-v1.10_${layer}_${lat}_${long}.tif')
+        filename = t.substitute({'layer': layer, 'lat': slat, 'long': slong})
+        return filename
+
+    def files(layers: List[str], latitudes: range, longitudes: range) -> dict:
+        files_per_layer = {}
+        permutations = list(it.product(latitudes, longitudes))
+        for layer in layers:
+            files_per_layer[layer] = [file(layer, lat, long) for (lat, long) in permutations]
+        return files_per_layer
+
+    thread_local = threading.local()
+    thread_local.session = requests.Session()
+
+    layers = files(['lossyear', 'treecover2000'], latitudes, longitudes)
+    for _, files in layers.items():
+        cache(thread_local.session, root, files, 'https://storage.googleapis.com/earthenginepartners-hansen/GFC-2022-v1.10', verbose=verbose)
+
+    return layers
+
+def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, longitudes: range, data: str, root: str = 'data', verbose: bool = False):
+
+    layers = cache_earthenginepartners_hansen(latitudes, longitudes, root, verbose=verbose)
+    
+    # TODO: it needs to wait for cache_earthenginepartners_hansen...
+
+    lossyears = layers['lossyear']
+    treecover2000 = layers['treecover2000']
+
+    # TODO: use a temporary file that the os chooses...
+    temp = f'{root}/earthenginepartners_hansen.csv'
+    shutil.copyfile(GEMFile, temp)
+
+    for lossyear in lossyears:
+        df = to_assets_with_lossyear(f'{root}/{lossyear}', temp, seperator, 16, verbose = verbose)
+        df.to_csv(temp, sep=seperator)
+
+    for treecover2000 in treecover2000:
+        df = to_assets_with_treecover2000(f'{root}/{treecover2000}', temp, seperator, verbose = verbose)
+        df.to_csv(temp, sep=seperator)
+
+    shutil.move(temp, data)
 
 def to_reg_sample(data, separator = "\t", max_year = 7): 
 

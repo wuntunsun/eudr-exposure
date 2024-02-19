@@ -101,7 +101,7 @@ def main():
     offset = args.offset
     geoTIFF = args.geoTIFF
     verbose = args.verbose
-    seperator = args.seperator.encode().decode("'unicode_escape'")
+    seperator = args.seperator.encode().decode('unicode_escape')
     window = args.window
 
     command = args.command
