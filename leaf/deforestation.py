@@ -207,7 +207,7 @@ def to_lossyear_timeseries(geoTIFF: str, window: Tuple[float, float, float, floa
         dissolve_time = time.time()
 
         group_ids = temp2.index.get_level_values(0).unique()
-        lossyears = map(str, range(2001, 2023))
+        lossyears = [str(lossyear) for lossyear in range(2001, 2023)]
 
         index = pd.MultiIndex.from_tuples(tuples=it.product(group_ids, lossyears), names=(Token.GROUP_ID, Token.VARIABLE))
         temp3 = temp2.reindex(index)
@@ -377,11 +377,6 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
     assert assets[Token.INDEX].nunique() == len(assets)
     assets = assets.set_index(Token.INDEX)
 
-    # Prepare final index
-    indices = assets.index.unique()
-    lossyears = map(str, range(2001, 2023))
-    index = pd.MultiIndex.from_tuples(tuples=it.product(indices, lossyears), names=(Token.INDEX, Token.VARIABLE))
-
     with rx.open_rasterio(geoTIFF).squeeze() as xda:
 
         if verbose:
@@ -407,6 +402,10 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
                         (assets.row < xda.rio.height - offset) & 
                         (assets.col < xda.rio.width - offset)].copy()
     
+        indices = local_assets.index.unique()
+        lossyears = [str(lossyear) for lossyear in range(2001, 2023)]
+        index = pd.MultiIndex.from_tuples(tuples=it.product(indices, lossyears), names=(Token.INDEX, Token.VARIABLE))
+
         np_row = local_assets.row.to_numpy()
         np_col = local_assets.col.to_numpy()
 
@@ -433,7 +432,10 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
         local_assets_by_lossyear.fillna(0, inplace=True)
         local_assets_by_lossyear.reset_index(inplace=True)
 
-        local_assets = local_assets_by_lossyear.pivot(index=Token.INDEX, columns=Token.VARIABLE, values=Token.VALUE)
+        local_assets_from_pivot = local_assets_by_lossyear.pivot(index=Token.INDEX, columns=Token.VARIABLE, values=Token.VALUE)
+        assert len(local_assets_from_pivot) == len(local_assets)
+        local_assets = local_assets_from_pivot
+        
         mergeable_columns = local_assets.columns.difference(assets.columns)
         mergeable_local_assets = local_assets[mergeable_columns]
         assets = assets.merge(mergeable_local_assets, how='left', validate='one_to_one', left_on=Token.INDEX, right_on=Token.INDEX)
@@ -545,14 +547,14 @@ def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, l
 
     layers = cache_earthenginepartners_hansen(latitudes, longitudes, root, verbose=verbose)
     
-    lossyears = layers['lossyear']
+    lossyear = layers['lossyear']
     treecover2000 = layers['treecover2000']
 
     # TODO: use a temporary file that the os chooses...
     temp = f'{root}/earthenginepartners_hansen.csv'
     shutil.copyfile(GEMFile, temp)
 
-    for lossyear in tqdm(lossyears, desc=f'to_assets_with_lossyear for latitudes: {latitudes} and longitudes: {longitudes}'):
+    for lossyear in tqdm(lossyear, desc=f'to_assets_with_lossyear for latitudes: {latitudes} and longitudes: {longitudes}'):
         df = to_assets_with_lossyear(f'{root}/{lossyear}', temp, seperator, 16, verbose = verbose)
         df.to_csv(temp, sep=seperator)
 
