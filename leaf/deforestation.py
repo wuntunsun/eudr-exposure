@@ -620,6 +620,14 @@ def to_reg_sample(data, separator = "\t", max_year = 7):
         var = 'defo_y' + str(i)
         df[var] = df.apply(defo_fix(i), axis = 1)
 
+    # create deciles of capacity by sector
+    df = df.sort_values(by=['sector_main', 'capacity_first'])
+    df['quintile_capacity'] = pd.qcut(df.groupby('sector_main')['capacity_first'].cumsum(), 10, labels=False)
+    df['quintile_capacity'] = df.quintile_capacity.apply(lambda x: -1 if pd.isnull(x) else x)
+
+    # fill in missing values for subsector
+    df['sector_sub_first'] = df.sector_sub_first.apply(lambda x: "unknown" if pd.isnull(x) else x)
+
     # save output 
     df.to_csv('data/regression_sample.csv', index=False, sep='\t', encoding='utf-8')
 
