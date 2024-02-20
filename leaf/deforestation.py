@@ -572,63 +572,68 @@ def to_reg_sample(data, separator = "\t", max_year = 7):
     rename_aux = {str(x): "deforestation_"+str(x) for x in range(2000, 2023)}
     df.rename(columns = rename_aux, inplace = True)
 
+    # keep only observations in countries where we obtained data
+    print(f"All assets: {len(df)}")
+    df = df[df.deforestation_2022 >= 0]
+    print(f"Our assets: {len(df)}")
+    
     # get columns which are not about deforstation
     i_cols = [col for col in df.columns if not col.startswith('deforestation_')]
+    def_cols = [col for col in df.columns if col.startswith('deforestation_')]
 
-    # reshape
-    df = pd.wide_to_long(df, "deforestation_", i = i_cols, j = 'year').reset_index()
+    df_invar = df[i_cols]
 
     # convert start year to integer
-    df['start_year_first'] = df.start_year_first.astype(int)
-    
-    # function to create year indicators around start-year of asset
-    def year_var(n):
-        return lambda x: 1 if x.year in range(x.start_year_first - math.floor(n/2), x.start_year_first + math.ceil(n/2)) else 0
+    df_invar['start_year_first'] = df_invar.start_year_first.astype(int)
 
-    for i in list(range(1, max_year + 1, 2)): 
-        var = 'y' + str(i)
-        df[var] = df.apply(year_var(i), axis = 1)
+    # reshape to long to get deforestation for each year for each asset
+    df_long = df[['uid_gem', 'start_year_first'] + def_cols]
+    df_long = pd.wide_to_long(df_long, 
+                            "deforestation_", 
+                            i = ['uid_gem', 'start_year_first'], 
+                            j = 'year').reset_index()
 
-    # function to get the deforestation for specific time windows
-    def defo_var(n): 
-        var = 'y' + str(n)
-        return lambda x: x.deforestation_ if x[var] == 1 else 0
+    # keep only observation in t = [-3, 3] around the start date of the asset
+    df_long['t'] = df_long['year'] - df_long['start_year_first']
+    df_long = df_long[df_long.t.between(-((max_year-1)/2), (max_year-1)/2)]
 
-    for i in list(range(1, max_year + 1, 2)): 
-        var = 'defo_y' + str(i)
-        df[var] = df.apply(defo_var(i), axis = 1)
+    # rename columns into something reasonable and pythonic
+    def var_name(t): 
+        return 't_m' + str(t*(-1)) if t < 0 else 't_' + str(t)
 
-    # aggregate on uid_gem level (step-wise to prevent losing observations)
-    sum_cols = [x for x in df.columns if x not in i_cols and x != 'year'] + ['uid_gem']
-    sum_cols
+    colnames = {x: var_name(x) for x in list(range(-3, 4))}
 
-    df_group = df[sum_cols].groupby('uid_gem').sum().rename(columns = {'deforestation_': 'defo_total'}).reset_index()
-    df_group.uid_gem.nunique()
+    # reshape back to wide format
+    df_wide = df_long.pivot(index='uid_gem', 
+                            columns='t', 
+                            values='deforestation_').reset_index().rename(columns = colnames)
 
-    df_invariant = df[i_cols].groupby('uid_gem').agg('first').reset_index()
-    df_invariant.uid_gem.nunique()
+    # merge with invariant features
+    df = pd.merge(df_invar, df_wide, how = 'inner', on = 'uid_gem')
 
-    df = pd.merge(df_invariant, df_group, how = 'inner', on = 'uid_gem')
+    # sum up some useful outcome variables:
+    def sum_window(start = -2, end = 2): 
+        vars_to_sum = []
 
-    # replace with nans the defo_ vars where there are not enough periods
-    def defo_fix(n): 
-        var_yr = 'y' + str(n)
-        var_defo = 'defo_' + var_yr
-        return lambda x: np.nan if x[var_yr] < n else x[var_defo]
+        # create a list of variables to sum 
+        for val in list(range(start, end + 1)): 
+            vars_to_sum.append(var_name(val)) 
+        
+        return vars_to_sum
+        
+    # create some nice default outcomes, giving nan if not all values are present
+    df['around_3'] = df[sum_window(-1, 1)].sum(axis=1, min_count = 3)
+    df['around_5'] = df[sum_window(-2, 2)].sum(axis=1, min_count = 5)
+    df['forward_3'] = df[sum_window(0, 2)].sum(axis=1, min_count = 3)
+    df['past_3'] = df[sum_window(-2, 0)].sum(axis=1, min_count = 3)
 
-    for i in list(range(1, max_year + 1, 2)): 
-        var = 'defo_y' + str(i)
-        df[var] = df.apply(defo_fix(i), axis = 1)
-
-    # create deciles of capacity by sector
-    df = df.sort_values(by=['sector_main', 'capacity_first'])
-    df['quintile_capacity'] = pd.qcut(df.groupby('sector_main')['capacity_first'].cumsum(), 10, labels=False)
-    df['quintile_capacity'] = df.quintile_capacity.apply(lambda x: -1 if pd.isnull(x) else x)
+    # # create deciles of capacity by sector
+    # df = df.sort_values(by=['sector_main', 'capacity_first'])
+    # df['quintile_capacity'] = pd.qcut(df.groupby('sector_main')['capacity_first'].cumsum(), 10, labels=False)
+    # df['quintile_capacity'] = df.quintile_capacity.apply(lambda x: -1 if pd.isnull(x) else x)
 
     # fill in missing values for subsector
     df['sector_sub_first'] = df.sector_sub_first.apply(lambda x: "unknown" if pd.isnull(x) else x)
 
     # save output 
     df.to_csv('data/regression_sample.csv', index=False, sep='\t', encoding='utf-8')
-
-    return df
