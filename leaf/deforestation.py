@@ -572,6 +572,12 @@ def to_reg_sample(data, separator = "\t", max_year = 7):
     rename_aux = {str(x): "deforestation_"+str(x) for x in range(2000, 2023)}
     df.rename(columns = rename_aux, inplace = True)
 
+    # keep only observations in countries where we obtained data
+    print(f"All assets: {len(df)}")
+    df = df[df.deforestation_2022 >= 0]
+    print(f"Our assets: {len(df)}")
+    print(f"Countries included: \n{df.country.unique()}")
+
     # get columns which are not about deforstation
     i_cols = [col for col in df.columns if not col.startswith('deforestation_')]
 
@@ -597,6 +603,8 @@ def to_reg_sample(data, separator = "\t", max_year = 7):
     for i in list(range(1, max_year + 1, 2)): 
         var = 'defo_y' + str(i)
         df[var] = df.apply(defo_var(i), axis = 1)
+
+    print(df.columns)
 
     # aggregate on uid_gem level (step-wise to prevent losing observations)
     sum_cols = [x for x in df.columns if x not in i_cols and x != 'year'] + ['uid_gem']
