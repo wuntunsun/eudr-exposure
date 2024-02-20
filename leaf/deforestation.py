@@ -576,11 +576,16 @@ def to_reg_sample(data, separator = "\t", max_year = 7):
     print(f"All assets: {len(df)}")
     df = df[df.deforestation_2022 >= 0]
     print(f"Our assets: {len(df)}")
-    
-    # get columns which are not about deforstation
+
+    # create column lists for splitting the dta
     i_cols = [col for col in df.columns if not col.startswith('deforestation_')]
     def_cols = [col for col in df.columns if col.startswith('deforestation_')]
 
+    # create a variable which has the total deforestation over the entire period
+    df['defo_total'] = df[def_cols].sum(axis = 1)
+    i_cols.append('defo_total')
+
+    # create a dataframe of invariant features
     df_invar = df[i_cols]
 
     # convert start year to integer
