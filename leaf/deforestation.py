@@ -248,13 +248,13 @@ def safe_floor(value: float) -> int:
     """
     return -1 if math.isnan(value) else math.floor(value)
 
-def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
+def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, separator: str, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
     """_summary_
 
     Args:
         geoTIFF (str): _description_
         GEMFile (str): _description_
-        seperator (str): _description_
+        separator (str): _description_
         window (Tuple[float, float, float, float], optional): _description_. Defaults to None.
         verbose (bool, optional): _description_. Defaults to False.
 
@@ -274,7 +274,7 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
 
     lookup = np.vectorize(select, excluded=[Token.XDARRAY], cache=False)
 
-    assets = pd.read_csv(GEMFile, sep=seperator)
+    assets = pd.read_csv(GEMFile, sep=separator)
 
     if verbose:
         print(f'{GEMFile}')
@@ -329,13 +329,13 @@ def to_assets_with_treecover2000(geoTIFF: str, GEMFile: str, seperator: str, win
 
     return assets
 
-def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: int = 16, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
+def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, separator: str, offset: int = 16, window: Tuple[float, float, float, float] = None, verbose: bool = False) -> pd.DataFrame:
     """_summary_
 
     Args:
         geoTIFF (str): _description_
         GEMFile (str): _description_
-        seperator (str): _description_
+        separator (str): _description_
         offset (int, optional): _description_. Defaults to 16.
         window (Tuple[float, float, float, float], optional): _description_. Defaults to None.
         verbose (bool, optional): _description_. Defaults to False.
@@ -366,7 +366,7 @@ def to_assets_with_lossyear(geoTIFF: str, GEMFile: str, seperator: str, offset: 
 
     lookup = np.vectorize(select, excluded=[Token.XDARRAY, Token.OFFSET], cache=False)
 
-    assets = pd.read_csv(GEMFile, sep=seperator)
+    assets = pd.read_csv(GEMFile, sep=separator)
     
     if verbose:
         print(f'{GEMFile}')
@@ -543,7 +543,7 @@ def cache_earthenginepartners_hansen(latitudes: range, longitudes: range, root: 
 
     return layers
 
-def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, longitudes: range, data: str, root: str = 'data', verbose: bool = False):
+def earthenginepartners_hansen(GEMFile: str, separator: str, latitudes: range, longitudes: range, data: str, offset: int = 16, root: str = 'data', verbose: bool = False):
 
     layers = cache_earthenginepartners_hansen(latitudes, longitudes, root, verbose=verbose)
     
@@ -555,18 +555,18 @@ def earthenginepartners_hansen(GEMFile: str, seperator: str, latitudes: range, l
     shutil.copyfile(GEMFile, temp)
 
     for lossyear in tqdm(lossyear, desc=f'to_assets_with_lossyear for latitudes: {latitudes} and longitudes: {longitudes}'):
-        df = to_assets_with_lossyear(f'{root}/{lossyear}', temp, seperator, 16, verbose = verbose)
-        df.to_csv(temp, sep=seperator)
+        df = to_assets_with_lossyear(f'{root}/{lossyear}', temp, separator, offset, verbose = verbose)
+        df.to_csv(temp, sep=separator)
 
     for treecover2000 in tqdm(treecover2000, desc=f'to_assets_with_treecover2000 for latitudes: {latitudes} and longitudes: {longitudes}'):
-        df = to_assets_with_treecover2000(f'{root}/{treecover2000}', temp, seperator, verbose = verbose)
-        df.to_csv(temp, sep=seperator)
+        df = to_assets_with_treecover2000(f'{root}/{treecover2000}', temp, separator, verbose = verbose)
+        df.to_csv(temp, sep=separator)
 
     shutil.move(temp, data)
 
-def to_reg_sample(data, separator = "\t", max_year = 7): 
+def to_reg_sample(GEMFile: str, separator: str, max_year = 7) -> pd.DataFrame: 
 
-    df = pd.read_csv(data, sep = separator)
+    df = pd.read_csv(GEMFile, sep = separator)
 
     # rename year columns to have a prefix
     rename_aux = {str(x): "deforestation_"+str(x) for x in range(2000, 2023)}
@@ -640,5 +640,4 @@ def to_reg_sample(data, separator = "\t", max_year = 7):
     # fill in missing values for subsector
     df['sector_sub_first'] = df.sector_sub_first.apply(lambda x: "unknown" if pd.isnull(x) else x)
 
-    # save output 
-    df.to_csv('data/regression_sample.csv', index=False, sep='\t', encoding='utf-8')
+    return df
