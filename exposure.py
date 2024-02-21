@@ -56,9 +56,11 @@ def main():
         description="""
     Perform a command...\n
     
-    > python -m exposure lossyear -a data/assets_for_deforestation.csv -gt data/Hansen_GFC-2022-v1.10_lossyear_20S_060W.tif -d data/assets_with_lossyear.csv -s ','\n
+    > python -m exposure lossyear -a data/assets_for_deforestation.csv -gt data/Hansen_GFC-2022-v1.10_lossyear_20S_060W.tif -d data/assets_with_lossyear.csv -s '\t'\n
                                                                 
-    > python -m exposure treecover2000 -a data/assets_with_lossyear.csv -gt data/Hansen_GFC-2022-v1.10_treecover2000_20S_060W.tif -d data/assets_with_deforestation.csv -s ','\n
+    > python -m exposure treecover2000 -a data/assets_with_lossyear.csv -gt data/Hansen_GFC-2022-v1.10_treecover2000_20S_060W.tif -d data/assets_with_deforestation.csv -s '\t'\n
+
+    > python -m exposure reg_sample -a data/assets_with_deforestation.csv -d data/regression_sample.csv -s '\t'
 
     Default seperator is , so use -s '\\t' for TAB.
 
@@ -87,7 +89,7 @@ def main():
                         help="The location as: lat long")
     parser.add_argument("-y", "--year", nargs='?', type=int,
                         default="2020", const="2020")
-    parser.add_argument("-s", "--seperator", nargs='?',
+    parser.add_argument("-s", "--separator", nargs='?',
                         default=",", const=",", )
     parser.add_argument("-v", "--verbose", action=argparse.BooleanOptionalAction,
                          default=False)
@@ -101,7 +103,7 @@ def main():
     offset = args.offset
     geoTIFF = args.geoTIFF
     verbose = args.verbose
-    seperator = args.seperator.encode().decode('unicode_escape')
+    separator = args.separator.encode().decode('unicode_escape')
     window = args.window
 
     command = args.command
@@ -129,18 +131,18 @@ def main():
             gdf = to_lossyear_timeseries(geoTIFF, window, verbose)
             gdf.to_file(geometry, driver='GPKG')
         case Command.ASSETS_WITH_LOSSYEAR:
-            df = to_assets_with_lossyear(geoTIFF, assets, seperator, offset, window, verbose)
-            df.to_csv(data, sep=seperator)
+            df = to_assets_with_lossyear(geoTIFF, assets, separator, offset, window, verbose)
+            df.to_csv(data, sep=separator)
         case Command.ASSETS_WITH_TREECOVER2000:
-            df = to_assets_with_treecover2000(geoTIFF, assets, seperator, window, verbose)
-            df.to_csv(data, sep=seperator)
+            df = to_assets_with_treecover2000(geoTIFF, assets, separator, window, verbose)
+            df.to_csv(data, sep=separator)
         case Command.WINDOW:
             gdf = gpd.read_file(geometry)
             result = window(gdf)
             print(f'File {geometry} contains Window: {result}')
         case Command.REG_SAMPLE:
-            to_reg_sample("data/assets_with_deforestation.csv")
-
+            df = to_reg_sample(assets, separator)
+            df.to_csv(data, index=False, sep=separator, encoding='utf-8')
 
 if __name__ == '__main__':
     main()
