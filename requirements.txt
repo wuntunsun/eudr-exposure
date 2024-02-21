@@ -18,4 +18,4 @@ pyproj==3.6.1
 missingno==0.5.2
 geopandas==0.14.2
 Cartopy==0.22.0
-ixgboost==2.0.3
+xgboost==2.0.3
