@@ -8,8 +8,6 @@ import seaborn as sns
 import random
 print(f'Summary {random.randint(0,99)}')
 
-st.sidebar.header('Summary')
-
 st.header("Data overview: assets")
 
 st.write("This tab displays information about the data for the selected region") 

@@ -20,6 +20,8 @@ import streamlit_app
 
 forest = '#284e13ff'
 
+st.set_page_config(layout="wide")
+
 # Initial session_state
 
 if 'geolocation_file' not in st.session_state:

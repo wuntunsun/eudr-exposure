@@ -113,5 +113,5 @@ def sidebar(state = st.session_state):
                     step =10, 
                     key= 'lon_range')
             
-            _ = st.form_submit_button(
+            _ = st.form_submit_button('Apply',
                 on_click=geography_changed)

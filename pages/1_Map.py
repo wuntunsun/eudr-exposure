@@ -26,14 +26,13 @@ print(f'Map {random.randint(0,99)}')
 #def get_map() -> Tuple[folium.Map, folium.FeatureGroup]:
 def get_map() -> folium.Map:
     # TODO: configure more...
-    print('get_map')
     m=folium.Map(zoom_start=1, min_zoom=1, tiles='cartodbpositron', prefer_canvas=True) 
-    #fg=folium.FeatureGroup(name="Geolocation Data")#.add_to(m)
-    #return (m, fg)
     return m
 
-def create_feature_group() -> folium.FeatureGroup:
-    fg=folium.FeatureGroup(name="Geolocation Data")#.add_to(m)
+def create_feature_group(markers: List[folium.Marker]) -> folium.FeatureGroup:
+    fg=folium.FeatureGroup(name="Geolocation Data")
+    for marker in markers:
+        fg.add_child(marker)  
     return fg
 
 @st.cache_data # will hash on function arguments...
@@ -65,23 +64,23 @@ def center(state = st.session_state) -> Optional[Tuple[float, float]]:
     return (lat, lng)
 
 def lat_range(state=st.session_state, step=10) -> Tuple[int, int]:
-    if 'bounds' in state.st_folium_data:
-        bounds=state.st_folium_data['bounds']
-        if all(key in bounds for key in ['_southWest', '_northEast']) and not bounds['_southWest'] is None and not bounds['_northEast'] is None:
-            min_lat = math.ceil(bounds['_southWest']['lat'])
-            max_lat = math.ceil(bounds['_northEast']['lat'])
-            return ((min_lat//step)*step, (max_lat//step)*step)
+    try:
+        min_lat = math.ceil(state.st_folium_data['bounds']['_southWest']['lat'])
+        max_lat = math.ceil(state.st_folium_data['bounds']['_northEast']['lat'])
+        return ((min_lat//step)*step, (max_lat//step)*step)
+    except:
+        pass
 
     return state.lat_range
 
 def lon_range(state=st.session_state, step=10) -> Tuple[int, int]:
-    if 'bounds' in state.st_folium_data:
-        bounds=state.st_folium_data['bounds']
-        if all(key in bounds for key in ['_southWest', '_northEast']) and not bounds['_southWest'] is None and not bounds['_northEast'] is None:
-            min_lng = math.ceil(bounds['_southWest']['lng'])
-            max_lng = math.ceil(bounds['_northEast']['lng'])
-            return ((min_lng//step)*step, (max_lng//step)*step)
-    
+    try:
+        min_lng = math.ceil(state.st_folium_data['bounds']['_southWest']['lng'])
+        max_lng = math.ceil(state.st_folium_data['bounds']['_northEast']['lng'])
+        return ((min_lng//step)*step, (max_lng//step)*step)
+    except:
+        pass
+
     return state.lon_range
 
 def filter_data(state = st.session_state):
@@ -101,20 +100,16 @@ st.write("In the map below, you can see the visualized location of the assets in
 
 # tiles: ['openstreetmap', 'MapQuest Open Aerial', 'mapquestopen']
 
-m = get_map()
-markers = get_markers(st.session_state.geolocation_file, 
-                      st.session_state.lat_range,
-                      st.session_state.lon_range)
-
-fg = create_feature_group()
-for marker in markers:
-    fg.add_child(marker)  
-
 with st.form(key='map'):
+
+    m = get_map()
+    markers = get_markers(st.session_state.geolocation_file, 
+                          st.session_state.lat_range,
+                          st.session_state.lon_range)
     # Nota bene: Robert Norris - creating a folium.FeatureGroup is enough to reset the map
     # unless we embed st_folium in an st.form!
     st.session_state.st_folium_data = st_folium(m, height=500,
-        feature_group_to_add=fg,
+        feature_group_to_add=create_feature_group(markers),
         key='geolocation_map') # change key to re-render map...
     
     _ = st.form_submit_button('Filter', on_click=filter_data)
