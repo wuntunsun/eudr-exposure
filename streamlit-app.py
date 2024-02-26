@@ -318,5 +318,12 @@ with sumstat:
 
 with risk:
 
-    st.header("Risk factor??")
+    st.header("🌲 Deforestation exposure")
+
+    # st.write(st.session_state.observation_data.head())
+
+    data = st.session_state.observation_data
+    cols_to_show = ['country', 'latitude', 'longitude', 'sector_main', 'treecover2000']
+    top_deforesters = data.sort_values('around_3', ascending= False).head(10)
+    st.write(top_deforesters.head(10))
 
