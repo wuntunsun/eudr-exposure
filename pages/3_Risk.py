@@ -3,11 +3,7 @@ import matplotlib.pyplot as plt
 
 from streamlit_app import sidebar, OBSERVATION_COLUMNS, ASSET_COLUMNS
 
-import random
-print(f'Risk {random.randint(0,99)}')
 
-# the top X assets with the asset name and the deforestation in the 
-# 3-year time window --> list of the assets associated with the most deforestation
 
 with st.expander('Assets associated with the most deforestation...'):
 
@@ -38,7 +34,7 @@ with st.expander('Assets associated with the most deforestation...'):
             sort_column = 'forward_3'
             period_columns = [sort_column]
 
-    assets_for_chosen_period = st.session_state.observation_data[ASSET_COLUMNS + period_columns]
+    assets_for_chosen_period = st.session_state.observation_data[ASSET_COLUMNS + period_columns].copy()
 
     block = st.slider("Select a block...", 
         0, len(assets_for_chosen_period), (0, 50), step=10)

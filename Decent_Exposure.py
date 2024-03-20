@@ -48,33 +48,6 @@ if 'st_folium_data' not in st.session_state:
     st.session_state.zoom=1
     st.session_state.st_folium_data={'center': {'lat': lat, 'lng': lng}, 'zoom': st.session_state.zoom}
 
-# if 'map_layer' not in st.session_state:
-#     st.toast('map_layer not set in st.session_state...')
-#     st.session_state.map_layer = pdk.Layer(
-#         "ScatterplotLayer",
-#         data=st.session_state.geolocation_data,
-#         get_position=["longitude", "latitude"],
-#         get_radius=10000,
-#         get_fill_color = [128, 0, 128, 140],
-#         #get_fill_color=lambda d: get_color(d["sector_main"]),
-#         pickable=True,
-#         auto_highlight=True)
-
-# if 'map_deck' not in st.session_state:
-#     st.toast('map_deck not set in st.session_state...')
-#     st.session_state.map_deck = pdk.Deck(
-#         #map_style="mapbox://styles/mapbox/outdoors-v11",
-#         map_style=None,
-#         initial_view_state=pdk.ViewState(
-#             latitude=(MIN_LAT + MAX_LAT) / 2,
-#             longitude=(MIN_LON + MAX_LON) / 2,
-#             zoom=2,
-#             pitch=0,
-#         ),
-#         layers=[st.session_state.map_layer])
-
 sidebar()
 
 st.title("Decent Exposure")
-st.header("header")
-st.subheader("subheader")

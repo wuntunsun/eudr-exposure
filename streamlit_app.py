@@ -101,8 +101,6 @@ def sidebar(state = st.session_state):
                         index=geolocation_file_index(),
                         key='geolocation_file')
             
-            print(f'lat_range sidebar {state.lat_range}')
-
             st.slider("Latitude range (North-South)", 
                     MIN_LAT, MAX_LAT, state.lat_range,
                     step =10, 

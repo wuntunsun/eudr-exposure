@@ -5,8 +5,7 @@ import altair as alt
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import random
-print(f'Summary {random.randint(0,99)}')
+
 
 st.header("Data overview: assets")
 
@@ -70,10 +69,5 @@ plt.ylabel('Density')
 plt.title('Capacity (normalized), by sector')
 
 st.pyplot(fig, use_container_width=True)
-#--------------------------------------------------------------
-#--------------------------------------------------------------
-st.header("Deforestation")
-
-st.write("TBD: ")
 
 sidebar()

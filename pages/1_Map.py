@@ -15,12 +15,7 @@ from os.path import isfile, join
 
 from typing import Tuple, Optional, List
 
-import random
-print(f'Map {random.randint(0,99)}')
 
-###############################################################
-########################## MAPS ###############################
-###############################################################
 
 @st.cache_data # will hash on function arguments...
 #def get_map() -> Tuple[folium.Map, folium.FeatureGroup]:
@@ -39,7 +34,6 @@ def create_feature_group(markers: List[folium.Marker]) -> folium.FeatureGroup:
 def get_markers(file: Optional[str], 
                 lat_range: Tuple[float, float], 
                 lon_range: Tuple[float, float]) -> [folium.Marker]:
-    print(f'get_markers {file} {lat_range} {lon_range}')
 
     def create_marker_at(location: Tuple[float, float]) -> folium.Marker:
         return folium.Circle([location[0], location[1]], radius=4, fill_color="green", fill_opacity=0.4, color="black", weight=1)
@@ -90,15 +84,9 @@ def filter_data(state = st.session_state):
 
     geography_changed(state)
 
-#--------------------------------------------------------------
-
 st.sidebar.header('Map')
 
-#st.subheader("Assets: visualized")
-
 st.write("In the map below, you can see the visualized location of the assets in your selected geography.")
-
-# tiles: ['openstreetmap', 'MapQuest Open Aerial', 'mapquestopen']
 
 with st.form(key='map'):
 
@@ -114,48 +102,6 @@ with st.form(key='map'):
     
     _ = st.form_submit_button('Filter', on_click=filter_data)
 
-#st.session_state.center=center()
 st.session_state.zoom=st.session_state.st_folium_data['zoom']
-
-#st.toast(st.session_state.geolocation_data.head(10))
-#st.map(st.session_state.geolocation_data[['latitude', 'longitude']], color = forest)
-
-# maps.write("WHY IS COLOR BY SECTOR IN CHART NOT WORKING OUT?!")
-# maps.write("WHY IS THE MAP NOT ZOOMING IN AUTOMATICALLY? 🥲")
-
-# # Sector color map
-# sector_color_map = {
-#     "wind power": [255, 0, 0],   # Red
-#     1: [0, 255, 0],   # Green
-#     2: [0, 0, 255],   # Blue
-#     3: [255, 255, 0], # Yellow
-#     4: [255, 0, 255], # Magenta
-#     5: [0, 255, 255], # Cyan    
-#     6: [128, 0, 0],   # Maroon
-#     7: [0, 128, 0],   # Green (dark)
-#     8: [0, 0, 128],   # Blue (dark)
-#     9: [128, 128, 0], # Olive
-#     10: [128, 0, 128] # Purple
-# }
-
-# # Function to get color based on sector
-# def get_color(sector):
-#     return sector_color_map.get(sector, [255, 128, 128]) 
-
-# # Function to calculate zoom level
-# def calculate_zoom_level(lat_range, lon_range):
-#     """
-#     Calculate the appropriate zoom level based on the selected latitude and longitude ranges.
-#     """
-#     # Example calculation - you may need to adjust this based on your specific requirements
-#     lat_span = lat_range[1] - lat_range[0]
-#     lon_span = lon_range[1] - lon_range[0]
-#     max_span = max(lat_span, lon_span)
-#     zoom_level = 14 - max_span  # Adjust 14 based on your preference for initial zoom level
-#     return zoom_level
-
-#--------------------------------------------------------------
-st.subheader("Sample asset")
-st.write("would sth like this be possible? how to do? would be imo interesting to go from the 'general' to the 'specific'.")
 
 sidebar()
