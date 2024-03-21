@@ -1,8 +1,8 @@
 # Decent Exposure: Deforestation and Physical Assets
 
-The task we set ourselves, in collaboration with [Climate & Company](https://climateandcompany.org), was to take observation data related to deforestation and combine it meaningfully with physcial asset data in a manner that supports Geospatial ESG. In addition we wanted to apply what we had learnt during the three-month Data Science Bootcamp at [SPICED](https://www.spiced-academy.com).
+The task we set ourselves, in collaboration with [Climate & Company](https://climateandcompany.org), was to take observation data related to deforestation and combine it meaningfully with physical asset data to support Geospatial ESG. In addition, we wanted to apply what we had learned during the three-month Data Science Bootcamp at [SPICED](https://www.spiced-academy.com).
 
-See our [final presentation](docs/decent_exposure_deforestation_and_physical_assets.pdf) for the results.
+See the results in our [final presentation](docs/decent_exposure_deforestation_and_physical_assets.pdf).
 
 ## Technology Stack
 
