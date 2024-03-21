@@ -4,9 +4,6 @@ The task we set ourselves, in collaboration with [Climate & Company](https://cli
 
 See our [final presentation](docs/decent_exposure_deforestation_and_physical_assets.pdf) for the results.
 
-kaplanova.mar@gmail.com
-wuntunsun/eudr-exposure
-
 ## Technology Stack
 
 Pandas, NumPy, GeoPandas, Rasterio, rioxarray, Cartopy, scikit-learn, XGBoost and Streamlit.
